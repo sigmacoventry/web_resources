@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Forensic Analyst Simulator — Full CAI Tutorial</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0f1f;--fg:#e5e7eb;--mut:#9fb0d1;--p:#0e1730;--b:#223059;--acc:#7bdcf4;
+  --ok:#86efac;--warn:#fca5a5;--glass:#7dd3fc;--dna:#a78bfa;--fiber:#fbbf24;
+  --trans-fast: 0.25s;
+  --trans-medium: 0.35s;
+  --ease-out: cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 "Inter", system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial; overflow-x: hidden;}
+.wrap{max-width:1040px;margin:auto;padding:16px; padding-bottom: 200px;}
+.hdr{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:12px}
+h1{margin:0;font-size:22px}
+textarea{ width: 100%; background: #0a0f1f; border: 1px solid var(--b); color: var(--fg); border-radius: 8px; padding: 8px; font-size: 14px; font-family: inherit; resize: vertical; transition: border-color var(--trans-fast), box-shadow var(--trans-fast);}
+textarea:focus{ outline: none; border-color: var(--acc); box-shadow: 0 0 0 3px rgba(123,220,244,.25); }
+.card{
+  background:var(--p);
+  border:1px solid var(--b);
+  border-radius:14px;
+  padding:14px;
+  margin-bottom:12px;
+  position:relative; 
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25); 
+  transition: transform var(--trans-medium) var(--ease-out), box-shadow var(--trans-medium) var(--ease-out);
+}
+.card:not(#board):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+}
+
+.soft{background:#0b1125;border:1px solid #26365f;border-radius:10px;padding:12px}
+.btn{
+  background:#111a36;
+  border:1px solid var(--b);
+  color:var(--fg);
+  padding:9px 12px;
+  border-radius:10px;
+  cursor:pointer;
+  font-size:15px; 
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2); 
+  transition: all var(--trans-fast) var(--ease-out);
+}
+.btn:hover{background:#1a2549;border-color:#4a5e99; transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.35);}
+.btn:active{transform: translateY(0px) scale(0.97); box-shadow: 0 1px 3px rgba(0,0,0,0.2);}
+.btn:disabled{opacity:.45;cursor:not-allowed; transform: none; box-shadow: 0 2px 5px rgba(0,0,0,0.2);}
+.btn.primary{background: var(--acc); color: var(--bg); font-weight: 600; border-color: transparent;}
+.btn.primary:hover{background: #a1e7fa;}
+.btn.primary:disabled{background: #111a36; color: var(--fg); opacity: .45; border: 1px solid var(--b);}
+.btn.sm{font-size:12px;padding:6px 8px}
+.mut{color:var(--mut);font-size:13px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.hidden{display:none}
+
+.board{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.tile{
+  background:#0c1630;
+  border:1px solid #2a3a67;
+  border-top:8px solid;
+  border-radius:10px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:space-between;
+  height:120px;
+  padding:10px;
+  cursor:pointer; 
+  transition: transform var(--trans-medium) var(--ease-out), box-shadow var(--trans-medium) var(--ease-out); 
+  opacity: 0; 
+  transform: translateY(20px); 
+  animation: fadeInSlideUp 0.5s var(--ease-out) forwards;
+}
+.tile:hover{transform: translateY(-4px); box-shadow: 0 8px 20px rgba(0,0,0,0.3);}
+.tile .cat{font-size:12px;color:#9fb0d1}
+.tile .val{font-size:20px;font-weight:800}
+
+.kpis{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.kpi{background:#0b1224;border:1px solid #2a3a67;border-radius:10px;padding:8px 12px;font-size:14px}
+#hostBar{margin:-2px 0 10px 0;background:#0b1224;border:1px solid #203159;border-radius:10px;padding:8px 10px;font-size:14px;color:#cfe4ff}
+
+.jeff{position:relative;height:42px;border-radius:10px;background:linear-gradient(90deg,#ef44441a,#0a1020,#22c55e1a);border:1px solid var(--b);overflow:hidden}
+.tick{position:absolute;top:0;bottom:0;width:1px;background:#314069}
+.tick>span{position:absolute;top:50%;transform:translate(-50%,-50%);font-size:10px;color:#cbd5e1;background:#0e1730;padding:0 4px;border-radius:4px}
+.marker{position:absolute;top:-4px;transform:translateX(-50%);transition:left .5s var(--ease-out)}
+.marker .dotm{width:14px;height:14px;border-radius:9999px;background:var(--acc);border:2px solid #1e2b50;box-shadow:0 0 0 3px rgba(123,220,244,.25)}
+
+#veil{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:900; opacity: 0; transition: opacity 0.3s ease; pointer-events: none;}
+.modal{position:fixed;z-index:901;top:50%;left:50%;max-width:760px;width:92%;max-height:80vh;overflow:auto;background:#0b1224;border:1px solid #1e2b50;border-radius:12px;padding:14px;box-shadow:0 12px 34px rgba(0,0,0,.6); opacity: 0; transform: translate(-50%, -50%) scale(0.95); pointer-events: none;}
+#veil.visible, .modal.visible { opacity: 1; pointer-events: auto; }
+.modal.visible { animation: popIn 0.35s var(--ease-out) forwards; }
+.modal .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;position:sticky;top:0;background:#0b1224}
+
+#main-flow, #guided-case-flow { display: flex; flex-direction: column; gap: 16px; }
+.step-container { opacity: 0; transform: translateY(15px); position: relative; }
+.step-container.visible { animation: fadeInSlideUp 0.4s var(--ease-out) forwards; }
+.step-container.hiding { animation: fadeOut 0.3s ease-out forwards; }
+.tutorial-step{ animation: fadeInSlideUp 0.4s ease-out; }
+
+textarea.word-trap{border-color:var(--warn)!important; box-shadow: 0 0 0 3px rgba(252, 165, 165, .35)!important;}
+.info-tag{background:#1e293b;border-radius:99px;padding:2px 8px;font-size:12px;margin-left:8px}
+.info-tag.strong{background:#166534;color:#dcfce7}
+.info-tag.weak{background:#7f1d1d;color:#fee2e2}
+
+#analystNotebook{position:fixed;right:-320px;top:80px;width:300px;height:420px;background:#0b1224;border:1px solid var(--b);border-radius:10px 0 0 10px;padding:10px;transition:right .3s var(--ease-out);z-index:800}
+#analystNotebook.open{right:0}
+#notebookContent{height:90%;overflow-y:auto;font-size:12px;white-space:pre-wrap;word-wrap:break-word}
+
+.formula-display{position:fixed;bottom:10px;right:10px;background:#0b1224;border:1px solid var(--b);padding:8px 12px;border-radius:10px;font-family:monospace;font-size:14px;z-index:850; opacity: 0; transition: opacity 0.3s; }
+.good{color:var(--ok)} .bad{color:var(--warn)}
+
+.scale-wrap{width:320px;margin:50px auto 30px auto;position:relative}
+.scale-bar{height:8px;background:#9fb0d1;border-radius:4px;position:relative;transform-origin:center;transition:transform .5s cubic-bezier(0.25, 1, 0.5, 1)}
+.scale-marker{position:absolute;top:-18px;transform:translateX(-50%);font-size:11px;color:#cbd5e1;background:#0b1224;border:1px solid #1f2a44;border-radius:8px;padding:2px 6px; transition: left 0.5s ease; white-space: nowrap;}
+.scale-marker::after{content:"";position:absolute;left:50%;top:100%;transform:translateX(-50%);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:6px solid #1f2a44}
+
+.tooltip-container { position: relative; display: inline-block; }
+.tooltip-text { visibility: hidden; width: 240px; background-color: #0b1224; color: var(--fg); text-align: left; border-radius: 6px; padding: 6px 8px; position: absolute; z-index: 1000; bottom: 125%; left: 50%; margin-left: -120px; opacity: 0; transition: opacity 0.3s; border: 1px solid var(--b); font-size: 12px; line-height: 1.45; }
+.tooltip-container:hover .tooltip-text { visibility: visible; opacity: 1; }
+.help-btn { position: absolute; top: 12px; right: 12px; }
+
+.calc-input { background: #0a0f1f; border: 1px solid var(--b); color: var(--fg); border-radius: 8px; padding: 8px; font-size: 16px; text-align: center; max-width: 100px; margin: 0 8px;}
+.calc-input:focus { outline: none; border-color: var(--acc); box-shadow: 0 0 0 3px rgba(123,220,244,.25); }
+.feedback { font-size: 13px; margin-top: 6px; min-height: 18px;}
+
+.progress-container { display: flex; width: 100%; background: #0a0f1f; border-radius: 8px; overflow: hidden; margin-bottom: 12px; border: 1px solid var(--b); }
+.progress-step { flex: 1; text-align: center; padding: 6px; font-size: 12px; color: var(--mut); transition: all 0.4s ease-out; }
+.progress-step.active { background: var(--acc); color: var(--bg); font-weight: 600; }
+
+@media (max-width:860px){.board{grid-template-columns:1fr 1fr;}}
+@media (max-width:760px){.grid2{grid-template-columns:1fr}}
+
+#badges{position:fixed;right:14px;top:14px;display:flex;flex-direction:column;gap:8px;z-index:950}
+.toast{background:#0b1224;border:1px solid #1e2b50;border-radius:10px;padding:10px 12px;min-width:220px;box-shadow:0 10px 24px rgba(0,0,0,.35);opacity:0;transform:translateY(-6px);transition:opacity .3s, transform .3s var(--ease-out)}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast b{display:block;margin-bottom:4px}
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+@keyframes fadeInSlideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes popIn {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+  70% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+.shake-error { animation: shake 0.4s; }
+
+/* ===== Overlay Tutor (click-through) ===== */
+#tourVeil{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1200;opacity:0;pointer-events:none;transition:opacity .3s}
+#tourHighlight{position:fixed;z-index:1202;border-radius:12px;outline:2px solid var(--acc);box-shadow:0 0 0 8px rgba(123,220,244,.18), 0 0 30px 10px rgba(123,220,244,.25);pointer-events:none;transition:all var(--trans-medium) var(--ease-out)}
+#tourCard{position:fixed;z-index:1203;max-width:360px;background:#0b1224;border:1px solid #1e2b50;border-radius:12px;padding:12px;opacity:0;transform:translateY(6px);transition:opacity .3s, transform .3s var(--ease-out)}
+#tourCard.show{opacity:1;transform:translateY(0)}
+#tourCard h4{margin:0 0 6px 0;font-size:16px}
+#tourCard p{margin:0;color:var(--mut);font-size:13px}
+#tourActions{display:flex;gap:6px;justify-content:flex-end;margin-top:10px}
+#tourActions .btn{padding:6px 10px;font-size:13px}
+#startTourBtn{margin-left:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hdr">
+    <div>
+      <h1>Forensic Analyst Simulator — <span class="mut">Full CAI Tutorial</span> ⚖️🔬</h1>
+      <div class="mut">A gamified learning tool for Case Assessment and Interpretation.</div>
+    </div>
+    <div class="kpis">
+      <div class="kpi">⭐ XP: <b id="score">0</b></div>
+      <div class="kpi">Title: <b id="analystTitle">Trainee</b></div>
+      <div class="kpi">🎯 Streak: <b id="streak">0</b></div>
+      <button id="notebookToggle" class="btn">📓 Notebook</button>
+      <button id="resetBtn" class="btn">🔄 Reset</button>
+      <button id="startTourBtn" class="btn">🎓 Guide</button>
+    </div>
+  </div>
+
+  <!-- Tutorial -->
+  <section id="tutorial" class="card">
+    <div id="tutorialContent"></div>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-top: 16px; border-top: 1px solid var(--b); padding-top: 14px;">
+      <div style="display:flex; gap:8px; align-items:center;">
+        <button class="btn sm sectionHow" data-section="tutorial">ℹ️ How to play</button>
+        <button id="skipTutorialBtn" class="btn">Skip Tutorial</button>
+      </div>
+      <div id="tutorialNav">
+        <button id="prevTutBtn" class="btn">Previous</button>
+        <button id="nextTutBtn" class="btn primary">Next</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Guided Case -->
+  <section id="guidedCase" class="card hidden">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+      <h3 style="margin:0;">Guided Case: The Blood Stain Example 🩸</h3>
+      <button class="btn sm sectionHow" data-section="guided">ℹ️ How to play</button>
+    </div>
+    <div id="guided-case-flow">
+      <div class="soft step-container" id="g-step1">
+        <p class="mut"><b>Scenario:</b> A crime stain is found. A suspect is arrested. Both the stain and the suspect have blood type X1. Population frequency: <b>0.01</b>.</p>
+        <p><b>Propositions:</b> C — from suspect. C̅ — from unknown.</p>
+        <div style="text-align:right;"><button class="btn primary" onclick="showNextStep('#g-step2')">Continue</button></div>
+      </div>
+      <div class="soft step-container" id="g-step2">
+        <h4 style="margin:0;">Numerator: P(E|C)</h4>
+        <div style="display:flex; align-items:center; justify-content:center; margin: 10px 0;">
+          P(E|C) = <input id="g-num-input" class="calc-input" placeholder="?">
+        </div>
+        <div class="feedback" id="g-num-feedback" aria-live="polite"></div>
+      </div>
+      <div class="soft step-container" id="g-step3">
+        <h4 style="margin:0;">Denominator: P(E|C̅)</h4>
+        <div style="display:flex; align-items:center; justify-content:center; margin: 10px 0;">
+          P(E|C̅) = <input id="g-den-input" class="calc-input" placeholder="?">
+        </div>
+        <div class="feedback" id="g-den-feedback" aria-live="polite"></div>
+      </div>
+      <div class="soft step-container" id="g-step4">
+        <h4 style="margin:0;">Likelihood Ratio</h4>
+        <div style="display:flex; align-items:center; justify-content:center; margin: 10px 0; font-size:18px;">
+          LR = &nbsp; <b>1</b> &nbsp; / &nbsp; <b>0.01</b> &nbsp; = <input id="g-lr-input" class="calc-input" placeholder="?">
+        </div>
+        <div class="feedback" id="g-lr-feedback" aria-live="polite"></div>
+      </div>
+      <div class="soft step-container" id="g-step5">
+        <h4 style="margin:0;">Conclusion</h4>
+        <p class="mut">LR <b>100</b> ⇒ moderate support for C.</p>
+        <div style="text-align:right;"><button class="btn primary" id="startCasesBtn">Proceed to Case Files</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Board -->
+  <section id="board" class="card hidden">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3>Case File Cabinet 🗄️</h3>
+      <button id="howToPlayBtn" class="btn sectionHow" data-section="board">ℹ️ How to play</button>
+    </div>
+    <div class="board" id="boardGrid"></div>
+  </section>
+
+  <!-- Flow -->
+  <section id="flow" class="card hidden">
+    <div id="hostBar" aria-live="polite">🎙️ Supervisor: New case.</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <h3><span id="caseIcon"></span> <span id="caseTitle"></span><span id="infoQuality" class="info-tag"></span></h3>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button id="flowHowBtn" class="btn sm sectionHow" data-section="flow">ℹ️ How to play</button>
+        <button id="retryCase" class="btn">↺ Retry case</button>
+        <button id="backBoard" class="btn">◂ Cabinet</button>
+      </div>
+    </div>
+    <div class="progress-container">
+      <div class="progress-step active" id="progress-s1">1. Propositions</div>
+      <div class="progress-step" id="progress-s2">2. Evaluate</div>
+      <div class="progress-step" id="progress-s3">3. Report</div>
+    </div>
+    <div id="main-flow">
+      <div id="step1" class="soft step-container">
+        <button class="btn sm help-btn" data-topic="step1">? Help</button>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div class="tooltip-container">
+            <div class="mut">Step 1: Frame Propositions</div>
+            <span class="tooltip-text">Define C and C̅. They must be mutually exclusive opposites.</span>
+          </div>
+          <div style="display:flex;gap:6px">
+            <div class="tooltip-container">
+              <button id="roleTheory" class="btn">ℹ️ Role</button>
+              <span class="tooltip-text">Understand your impartial role as an analyst.</span>
+            </div>
+          </div>
+        </div>
+        <div id="IText" class="soft" style="margin-top:6px;font-style:italic">—</div>
+        <div id="proposition-box" class="soft" style="margin-top:10px">
+          <div class="mut">Propositions must be mutually exclusive and exhaustive.</div>
+          <div style="display:flex;gap:8px;margin-top:6px">
+            <textarea id="hp" rows="2" placeholder="C: The prosecution proposition."></textarea>
+            <textarea id="hd" rows="2" placeholder="C̅: The defence proposition."></textarea>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+            <div class="tooltip-container"><button id="chipSource" class="btn">Source</button><span class="tooltip-text">Use for simple matches (e.g., DNA from suspect vs. other).</span></div>
+            <div class="tooltip-container"><button id="chipActivity" class="btn">Activity</button><span class="tooltip-text">Use when the question is about *how* material was deposited.</span></div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:10px;">
+          <button id="submitProps" class="btn primary" disabled>📝 Submit Propositions</button>
+        </div>
+      </div>
+
+      <div id="step2" class="soft step-container">
+        <button class="btn sm help-btn" data-topic="step2">? Help</button>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div class="tooltip-container">
+            <h4 style="margin:0">Step 2: Evaluate Evidence</h4>
+            <span class="tooltip-text">Assess how rare the evidence is, assuming the defence proposition (C̅) is true.</span>
+          </div>
+          <div class="tooltip-container">
+            <button id="formS2" class="btn">∑ LR Formula</button>
+            <span class="tooltip-text">LR = P(E|C) / P(E|C̅)</span>
+          </div>
+        </div>
+        <div class="mut" style="margin-top:4px;">How common is this evidence under C̅?</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+          <div class="tooltip-container"><button class="btn rarity" data-level="common">Common</button><span class="tooltip-text">Very common → low LR, supports C̅.</span></div>
+          <div class="tooltip-container"><button class="btn rarity" data-level="uncommon">Uncommon</button><span class="tooltip-text">Somewhat unusual → moderate LR, supports C.</span></div>
+          <div class="tooltip-container"><button class="btn rarity" data-level="rare">Rare</button><span class="tooltip-text">Very rare → high LR, strongly supports C.</span></div>
+        </div>
+        <div class="grid2" style="margin-top:10px">
+          <div class="soft">
+            <div class="mut">Result (Verbal & LR)</div>
+            <div id="verbalOneLine" style="margin-top:6px;font-weight:700">—</div>
+            <div id="whyLine" class="mut" style="margin-top:6px"></div>
+          </div>
+          <div class="soft">
+            <div class="mut">Jeffreys/FSR bar (log scale)</div>
+            <div id="scale" class="jeff" style="margin-top:6px"></div>
+            <div class="mut" style="display:flex;justify-content:space-between"><span>favours C̅</span><span>neutral</span><span>favours C</span></div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:10px">
+          <button id="lockQual" class="btn primary" disabled>🔐 Lock & Continue</button>
+        </div>
+      </div>
+
+      <div id="step3" class="soft step-container">
+        <button class="btn sm help-btn" data-topic="step3">? Help</button>
+        <div class="tooltip-container">
+          <h4 style="margin:0 0 6px 0">Step 3: Report Findings</h4>
+          <span class="tooltip-text">Map your LR to a verbal statement and write one neutral sentence.</span>
+        </div>
+        <div id="verbalChallenge" class="soft"></div>
+        <div id="reportBox" class="soft hidden" style="margin-top:10px">
+          <div class="mut" id="sum">—</div>
+          <div class="soft" style="margin:8px 0">
+            <b>Checklist:</b>
+            <ul class="mut" style="margin:6px 0 0 16px">
+              <li id="tBand" class="bad">State a verbal band (e.g., "moderate support")</li>
+              <li id="tSide" class="bad">State which proposition is supported</li>
+              <li id="tNoOff" class="bad">Avoid offence-level language (guilt/innocence)</li>
+            </ul>
+          </div>
+          <div class="tooltip-container">
+            <button id="autoDraft" class="btn" style="margin-bottom:8px">✍️ Auto-draft neutral sentence</button>
+            <span class="tooltip-text">Generate a neutral starting point based on your findings.</span>
+          </div>
+          <textarea id="freeText" rows="3" placeholder="Write one neutral sentence…"></textarea>
+          <div style="display:flex;justify-content:flex-end;margin-top:10px">
+            <div class="tooltip-container">
+              <button id="submitCourt" class="btn primary" disabled>✅ Submit Report to Court</button>
+              <span class="tooltip-text">Finalise your analysis and submit.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Summary -->
+  <section id="summary" class="card hidden" style="padding-bottom:18px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+      <h3 style="margin:0;">Case Debrief 📈</h3>
+      <button class="btn sm sectionHow" data-section="summary">ℹ️ How to play</button>
+    </div>
+    <div class="grid2">
+      <div class="soft"><b>Performance</b><div id="debriefMetrics" class="mut"></div></div>
+      <div class="soft">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <b>Scales of Justice ⚖️</b>
+          <button id="scalesHelpBtn" class="btn sm">ℹ️ What is this?</button>
+        </div>
+        <div class="mut">See how your LR tilts the court’s prior odds.</div>
+        <div style="margin-top:6px;">
+          <select id="priorSel" class="btn" style="width:100%;">
+            <option value="balanced">Court prior: balanced (1:1)</option>
+            <option value="leansCb">Court prior: leans C̅ (1:10)</option>
+            <option value="leansC">Court prior: leans C (10:1)</option>
+          </select>
+        </div>
+        <div class="scale-wrap">
+          <div id="scaleArm" class="scale-bar"></div>
+          <div id="mPrior" class="scale-marker">Prior</div>
+          <div id="mEvidence" class="scale-marker">Evidence (LR)</div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:10px" class="mut">
+            <span>C̅</span><span>Neutral</span><span>C</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button id="applyTilt" class="btn primary" style="flex:1">Apply Evidence Tilt</button>
+          <button id="resetTilt" class="btn" style="flex:0 0 auto">Reset Tilt</button>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:10px">
+      <button id="playAgain" class="btn">🎲 New Board</button>
+    </div>
+  </section>
+</div>
+
+<div id="formulaDisplay" class="formula-display hidden">Posterior Odds = LR × Prior Odds</div>
+<div id="analystNotebook">
+  <h4 style="margin:0 0 8px 0;text-align:center">Analyst’s Notebook 📓</h4>
+  <div id="notebookContent"></div>
+</div>
+<div id="badges"></div>
+<div id="veil"></div>
+<div id="modal" class="modal" role="dialog" aria-modal="true">
+  <div class="head"><b id="modalTitle">Info</b><button id="closeModal" class="btn" aria-label="Close modal">✕</button></div>
+  <div id="modalBody" class="mut">—</div>
+</div>
+
+<!-- Overlay tutor layer -->
+<div id="tourVeil"></div>
+<div id="tourHighlight" style="display:none"></div>
+<div id="tourCard" style="display:none">
+  <h4 id="tourTitle">Guide</h4>
+  <p id="tourText">—</p>
+  <div id="tourActions">
+    <button id="tourBack" class="btn sm">Back</button>
+    <button id="tourSkip" class="btn sm">Skip</button>
+    <button id="tourNext" class="btn sm primary">Next</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ====== App Helpers ====== */
+const $ = s => document.querySelector(s);
+function show(id){
+  ['#tutorial', '#guidedCase', '#board','#flow','#summary'].forEach(sel=>$(sel).classList.add('hidden'));
+  $(id).classList.remove('hidden');
+  $("#formulaDisplay").style.opacity = (id === '#flow') ? 1 : 0;
+}
+function openModal(t,html){ $("#modalTitle").textContent=t; $("#modalBody").innerHTML=html; $("#veil").classList.add('visible'); $("#modal").classList.add('visible'); }
+function closeModal(){ $("#veil").classList.remove('visible'); $("#modal").classList.remove('visible'); }
+
+function openConfirmModal(title, html, onConfirm) {
+    openModal(title, html);
+    const modalBody = $('#modalBody');
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.cssText = `display:flex; justify-content:flex-end; gap:8px; margin-top:16px; border-top: 1px solid var(--b); padding-top: 12px;`;
+    
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'btn';
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.onclick = closeModal;
+
+    const confirmBtn = document.createElement('button');
+    confirmBtn.className = 'btn primary';
+    confirmBtn.textContent = 'Confirm';
+    confirmBtn.onclick = () => {
+        onConfirm();
+        closeModal();
+    };
+
+    buttonContainer.appendChild(cancelBtn);
+    buttonContainer.appendChild(confirmBtn);
+    modalBody.appendChild(buttonContainer);
+}
+
+function setHost(m){ $("#hostBar").textContent = '🎙️ Supervisor: ' + m; }
+$("#veil").onclick=closeModal; $("#closeModal").onclick=closeModal;
+
+function badge(title, body, type = 'default', ms=3200){
+  const wrap=$("#badges");
+  const t=document.createElement('div');
+  t.className='toast';
+  const icons = { 'default': '🏅', 'success': '🎯', 'error': '⚠️', 'promo': '🎉' };
+  t.innerHTML=`<b>${icons[type] || '🏅'} ${title}</b><div class="mut">${body}</div>`;
+  wrap.appendChild(t);
+  requestAnimationFrame(()=>t.classList.add('show'));
+  setTimeout(()=>{ t.classList.remove('show'); setTimeout(()=>t.remove(),300); }, ms);
+}
+
+const CATS=[{key:'glass',icon:'🪟',color:'var(--glass)'},{key:'dna',icon:'🧬',color:'var(--dna)'},{key:'fiber',icon:'🧵',color:'var(--fiber)'}];
+const TILES=[
+  {cat:'glass',title:'Glass RI match',infoQ:'strong', I:['Fragments on sleeve after shop window smashed.','Ordinary plate glass at scene.','Suspect detained nearby.'], E:'Fragments RI indistinguishable from the scene window.', truth:{rarity:'uncommon', lr:100, band:'moderate support for C', side:'C'}},
+  {cat:'dna',title:'Partial DNA Profile',infoQ:'weak', I:['A struggle occurred under the victim\'s fingernails.','A low-level partial DNA profile was recovered.', 'The suspect is one of many potential contributors.'], E:'The suspect cannot be excluded as a contributor to the partial DNA profile.', truth:{rarity:'uncommon', lr:50, band:'moderate support for C', side:'C'}},
+  {cat:'fiber',title:'Rare carpet fibers',infoQ:'strong', I:['Clump of rare fibers on driver floor mat.','Victim’s home has rare carpet.','Suspect claims prior innocent visit.'], E:'Composition and cross-section match the rare carpet.', truth:{rarity:'rare', lr:1000, band:'strong support for C', side:'C'}},
+  {cat:'fiber', title:'Common Cotton Fibers', infoQ:'weak', I:['Victim assaulted in a public park.', 'Suspect wearing a common blue cotton jacket.', 'Suspect claims they were just walking in the park.'], E:'Blue cotton fibers found on the victim are indistinguishable from the suspect\'s jacket.', truth:{rarity:'common', lr:0.1, band:'moderate support for C̅', side:'C̅'}}
+];
+
+const tutorialSteps = [
+  { title: "Welcome to the CAI Simulator!", content: `<p>This simulator will walk you through the fundamentals of <b>Case Assessment and Interpretation (CAI)</b>.</p><p>We'll start with the theory before your first case.</p>` },
+  { title: "1. The 'Why': A Need for Impartiality", content: `<p>CAI prevents overstating or misinterpreting scientific evidence.</p><p class="mut">Your role is to explain evidence strength, not decide guilt.</p>` },
+  { title: "2. The Three Laws of Probability", content: `Everything in CAI is built on probability theory.
+    <ul class="mut" style="margin-top: 8px;">
+      <li><b>Values:</b> between 0 and 1.</li>
+      <li><b>Addition (mutually exclusive):</b> Pr(A or B) = Pr(A)+Pr(B).</li>
+      <li><b>Multiplication (independent):</b> Pr(A and B) = Pr(A)×Pr(B).</li>
+    </ul>` },
+  { title: "3. Conditional Probability", content: `<p>We evaluate probabilities <b>given</b> something else: <code>P(A|B)</code>.</p><p class="mut">This is read as "The probability of A, given B."</p>` },
+  { title: "4. Propositions", content: `<p>We evaluate evidence (E) under two opposing propositions:</p>
+    <ul class="mut" style="margin-top: 8px;">
+      <li><b>C:</b> prosecution (e.g., DNA is from the suspect)</li>
+      <li><b>C̅:</b> defence (e.g., DNA is from someone else)</li>
+    </ul>` },
+  { title: "5. Likelihood Ratio (LR)", content: `<p>The LR is the core of CAI. It tells us how much more likely the evidence is under one proposition versus the other.</p><pre class="soft" style="text-align:center;">LR = P(E|C) / P(E|C̅)</pre>` }
+];
+
+const helpContent = {
+  tutorial:{title:"ℹ️ How to play — Tutorial",content:`<ol class="mut" style="margin-left:1em"><li>Read each slide then press <b>Next</b>.</li><li>Use <b>Previous</b> to revisit earlier topics.</li><li>On the last slide, press <b>Start Guided Case</b>.</li><li>Or press <b>Skip Tutorial</b> to jump straight to the cases.</li><li>Open the <b>📓 Notebook</b> anytime to see the verbal scale.</li></ol>`},
+  guided:{title:"ℹ️ How to play — Guided Case",content:`<ol class="mut" style="margin-left:1em"><li>Press <b>Continue</b> to advance through the scenario.</li><li>Enter the correct values: <code>1</code>, <code>0.01</code>, and <code>100</code> in order.</li><li>Correct answers (green feedback) unlock the next step.</li><li>Press <b>Proceed to Case Files</b> when finished.</li></ol>`},
+  board:{title:"ℹ️ How to play — Case File Cabinet",content:`<ol class="mut" style="margin-left:1em"><li>Click any tile to open that case.</li><li>Use the <b>◂ Cabinet</b> button to return to this screen at any time.</li></ol>`},
+  flow:{title:"ℹ️ How to play — Case Flow",content:`<ol class="mut" style="margin-left:1em"><li><b>Step 1</b>: Read the case, write C and C̅, then <b>📝 Submit</b>.</li><li><b>Step 2</b>: Choose the evidence rarity, review the LR, then <b>🔐 Lock & Continue</b>.</li><li><b>Step 3</b>: Choose the verbal band, draft your neutral sentence, then <b>✅ Submit Report</b>.</li></ol>`},
+  summary:{title:"ℹ️ How to play — Debrief",content:`<ol class="mut" style="margin-left:1em"><li>Review your XP, streak, and the final LR.</li><li>Use the 'Scales of Justice' to see how prior odds and the LR combine.</li><li><b>🎲 New Board</b> to start again with a fresh set of cases.</li></ol>`},
+  step1:{title:"ℹ️ How to play — Step 1",content:`<ol class="mut" style="margin-left:1em"><li>Read the case information (I) carefully.</li><li>Use the 'Source' or 'Activity' buttons for templates if you're stuck.</li><li>Enter C and C̅, then submit.</li></ol>`},
+  step2:{title:"ℹ️ How to play — Step 2",content:`<ol class="mut" style="margin-left:1em"><li>Based on the case info, decide how common the evidence is if C̅ is true.</li><li>Select a rarity. This determines your LR.</li><li>Review the verbal output and the Jeffreys bar.</li><li>Lock your choice to continue.</li></ol>`},
+  step3:{title:"ℹ️ How to play — Step 3",content:`<ol class="mut" style="margin-left:1em"><li>First, pick the correct verbal statement from the options.</li><li>Then, write one neutral sentence summarizing your findings. Use the checklist to guide you.</li><li>Submit when all checks are green.</li></ol>`}
+};
+
+let currentTutorialStep = 0;
+
+function renderTutorialStep(index) {
+  const step = tutorialSteps[index];
+  $('#tutorialContent').innerHTML = `<h3 style="margin-top:0;">${step.title}</h3><div class="mut">${step.content}</div>`;
+  $('#prevTutBtn').disabled = index === 0;
+  $('#nextTutBtn').textContent = (index === tutorialSteps.length - 1) ? "Start Guided Case" : "Next";
+}
+
+function triggerShake(el) {
+    el.classList.add('shake-error');
+    el.addEventListener('animationend', () => el.classList.remove('shake-error'), { once: true });
+}
+
+function initGuidedCase() {
+  ['#g-step1', '#g-step2', '#g-step3', '#g-step4', '#g-step5'].forEach(s => $(s).classList.add('hidden'));
+  showNextStep('#g-step1');
+
+  const numInput = $('#g-num-input'), denInput = $('#g-den-input'), lrInput = $('#g-lr-input');
+  const numFeedback = $('#g-num-feedback'), denFeedback = $('#g-den-feedback'), lrFeedback = $('#g-lr-feedback');
+  numInput.value = ''; denInput.value = ''; lrInput.value = '';
+  numFeedback.textContent = ''; denFeedback.textContent = ''; lrFeedback.textContent = '';
+  numFeedback.className = 'feedback'; denFeedback.className = 'feedback'; lrFeedback.className = 'feedback';
+
+  numInput.oninput = () => {
+    if (numInput.value === '1' || numInput.value === '1.0') {
+      numFeedback.textContent = '✅ Correct! It is certain (P=1) we would find the evidence if C is true.';
+      numFeedback.className = 'feedback good'; showNextStep('#g-step3');
+    } else { numFeedback.textContent = 'Hint: If the suspect is the source, what is the probability the evidence matches? It must be 1.'; numFeedback.className = 'feedback bad'; }
+  };
+  denInput.oninput = () => {
+    if (parseFloat(denInput.value) === 0.01) {
+      denFeedback.textContent = '✅ Correct! This is the random match probability given in the scenario.';
+      denFeedback.className = 'feedback good'; showNextStep('#g-step4');
+    } else { denFeedback.textContent = 'Hint: Use the population frequency of 0.01 (1 in 100).'; denFeedback.className = 'feedback bad'; }
+  };
+  lrInput.oninput = () => {
+    if (parseFloat(lrInput.value) === 100) {
+      lrFeedback.textContent = '✅ Perfect. The Likelihood Ratio is 100.';
+      lrFeedback.className = 'feedback good'; showNextStep('#g-step5');
+    } else { lrFeedback.textContent = 'Hint: The LR is 1 divided by 0.01.'; lrFeedback.className = 'feedback bad'; }
+  };
+  
+  [numInput, denInput, lrInput].forEach(input => {
+    input.addEventListener('input', e => {
+      const isCorrect = (input.id === 'g-num-input' && (input.value === '1' || input.value === '1.0')) || 
+                        (input.id === 'g-den-input' && parseFloat(input.value) === 0.01) ||
+                        (input.id === 'g-lr-input' && parseFloat(input.value) === 100);
+      if (!isCorrect && input.value !== '') {
+        triggerShake(input);
+      }
+    });
+  });
+}
+
+let state;
+function freshState(){return{ score:0, streak:0, current:null, chosenRarity:null, side:'', band:'', hp:'', hd:'' };}
+function addScore(n){
+  state.score+=n; $("#score").textContent=state.score;
+  const oldTitle = $("#analystTitle").textContent;
+  const newTitle = state.score<200?'Trainee':state.score<500?'Analyst':state.score<1000?'Senior Analyst':'Principal Scientist';
+  $("#analystTitle").textContent = newTitle;
+  if(newTitle !== oldTitle) badge('Promotion! 🎉', `You are now a ${newTitle}.`, 'promo');
+}
+function note(msg){ const c=$("#notebookContent"); c.textContent+=msg+'\n\n'; c.scrollTop=c.scrollHeight; }
+function populateNotebook(){
+  $("#notebookContent").textContent = `--- VERBAL SCALE ---\n
+LR > 1M: Extremely strong
+10k - 1M: Very strong
+1k - 10k: Strong
+100 - 1k: Moderately strong
+10 - 100: Moderate
+1 - 10: Limited
+1: Inconclusive
+0.1 - 1: Limited (for C̅)
+...and so on.\n\n--- CASE NOTES ---\n`;
+}
+
+function renderBoard(){
+  const g=$("#boardGrid"); g.innerHTML='';
+  TILES.forEach((t,i)=>{
+    const d=document.createElement('div');
+    d.className='tile'; d.style.borderTopColor=CATS.find(c=>c.key===t.cat).color;
+    d.style.animationDelay = `${i * 0.05}s`;
+    d.innerHTML=`<div class="cat">${CATS.find(c=>c.key===t.cat).icon} ${t.title}</div><div class="val">Open</div>`;
+    d.onclick=()=>startCase(i,t);
+    g.appendChild(d);
+  });
+}
+function fullReset(){
+  currentTutorialStep = 0;
+  renderTutorialStep(0);
+  show('#tutorial');
+  state=freshState();
+  $("#score").textContent='0'; $("#streak").textContent='0'; $("#analystTitle").textContent='Trainee';
+  populateNotebook();
+  setHost('Welcome. Please review the CAI fundamentals.');
+}
+
+function startCase(idx, t){
+  state.current = {idx, ...t}; state.hp = ''; state.hd = '';
+  show('#flow'); setHost('Case opened. Start with propositions.');
+  $("#caseIcon").textContent=CATS.find(c=>c.key===t.cat).icon; $("#caseTitle").textContent=t.title;
+  const iq=$("#infoQuality"); iq.textContent='Info: '+t.infoQ; iq.className='info-tag '+(t.infoQ==='strong'?'strong':'weak');
+  ['#step1', '#step2', '#step3'].forEach(s => { $(s).classList.add('hidden'); $(s).classList.remove('visible'); });
+  ['#progress-s2', '#progress-s3'].forEach(s => $(s).classList.remove('active'));
+  $("#retryCase").onclick=()=>startCase(idx,t);
+  $("#backBoard").onclick=()=>{ show('#board'); setTimeout(renderBoard, 50); };
+  renderStep1();
+}
+
+function showNextStep(stepSelector) {
+    document.querySelectorAll('.step-container.visible').forEach(el => {
+        if (`#${el.id}` !== stepSelector) {
+            el.classList.remove('visible');
+            el.classList.add('hiding');
+            el.addEventListener('animationend', () => {
+                el.classList.add('hidden');
+                el.classList.remove('hiding');
+            }, { once: true });
+        }
+    });
+    const el = $(stepSelector);
+    if (el) {
+        el.classList.remove('hidden', 'hiding');
+        setTimeout(() => el.classList.add('visible'), 20);
+    }
+}
+
+function renderStep1() {
+  $("#IText").textContent = state.current.I.join(' ');
+  $("#chipSource").onclick=()=>{ $("#hp").value="The trace came from the scene source."; $("#hd").value="The trace came from an alternative source."; checkProps(); };
+  $("#chipActivity").onclick=()=>{ $("#hp").value="The trace was deposited during the alleged activity."; $("#hd").value="The trace was deposited during an alternative innocent activity."; checkProps(); };
+  $("#roleTheory").onclick=()=>openModal('🤔 Role of the Expert', `<p><b>Stay in your lane:</b> Assess <i>strength of evidence</i> at <b>source</b> or <b>activity</b> level.</p><ul class="mut"><li><b>Source:</b> this vs another source</li><li><b>Activity:</b> alleged vs innocent activity</li><li><b>Offence:</b> guilt is for the court</li></ul>`);
+  function checkProps(){ $("#submitProps").disabled = !($("#hp").value.trim() && $("#hd").value.trim()); }
+  $("#hp").oninput=checkProps; $("#hd").oninput=checkProps;
+  $("#hd").value = state.hd || ''; $("#hp").value = state.hp || ''; checkProps();
+  $("#submitProps").onclick=()=>{
+    state.hp = $("#hp").value; state.hd = $("#hd").value;
+    addScore(25);
+    badge('Propositions Logged 📝', '+25 XP for framing the case.', 'success');
+    note('C: '+ state.hp +'\nC̅: '+ state.hd);
+    if (!localStorage.getItem('cai_insight_step1')) {
+        localStorage.setItem('cai_insight_step1','1');
+        showTransientInsight('#step1', `<b>Why Opposites?</b> C and C̅ must be mutually exclusive. This ensures there's no middle ground, forcing a clear comparison of evidence against two distinct scenarios.`);
+    }
+    showNextStep('#step2'); renderRarity();
+  };
+  showNextStep('#step1');
+}
+
+function buildScale(containerId, side='neutral'){
+  const el=$("#"+containerId); el.innerHTML=''; const min=-3,max=3;
+  [-3,0,3].forEach(x=>{ const t=document.createElement('div'); t.className='tick'; t.style.left=((x-min)/(max-min))*100+'%'; const sp=document.createElement('span'); sp.textContent=(x===0?'0':(x>0?'+':'')+x); t.appendChild(sp); el.appendChild(t); });
+  const m=document.createElement('div'); m.id=containerId+'_marker'; m.className='marker'; m.innerHTML='<div class="dotm"></div>'; el.appendChild(m);
+  placeMarker(containerId, side);
+}
+function placeMarker(id, side){
+  const m=$("#"+id+"_marker"); const pos = side==='C̅' ? 15 : side==='C' ? 85 : 50; m.style.left=pos+'%';
+}
+
+function renderRarity(){
+  $('#progress-s2').classList.add('active');
+  buildScale('scale','neutral');
+  $("#formS2").onclick=()=>openModal('∑ Formula — Likelihood Ratio', `<p>The LR is the ratio of two conditional probabilities:</p><pre class="soft">LR = P(Evidence | C) / P(Evidence | C̅)</pre><p>Teaching simplification: assume P(E|C)=1 ⇒ <b>LR ≈ 1 / P(E | C̅)</b>.</p>`);
+  document.querySelectorAll('.rarity').forEach(b => b.style.borderColor = '');
+  $("#verbalOneLine").textContent='—'; $("#whyLine").textContent=''; $("#lockQual").disabled=true;
+
+  document.querySelectorAll('.rarity').forEach(b=>b.onclick=(e)=>{
+    document.querySelectorAll('.rarity').forEach(x=>x.style.borderColor='');
+    e.target.style.borderColor='var(--acc)';
+    state.chosenRarity = e.target.dataset.level;
+    let result = (state.chosenRarity === state.current.truth.rarity) ? state.current.truth : TILES.find(t => t.truth.rarity === state.chosenRarity)?.truth || {lr:1, band:'inconclusive', side:'neutral'};
+    state.band = result.band; state.side = result.side;
+    $("#verbalOneLine").textContent = `${result.band} (${result.side})`;
+    $("#whyLine").textContent = `Corresponds to LR ≈ ${result.lr}.`;
+    placeMarker('scale', result.side);
+    $("#lockQual").disabled = false;
+  });
+
+  $("#lockQual").onclick=()=>{
+    note(`Rarity choice: ${state.chosenRarity}.\nResulting LR: ${state.current.truth.lr}.`);
+    if(state.chosenRarity === state.current.truth.rarity) {
+      state.streak++;
+      const bonus = state.streak > 1 ? state.streak * 5 : 0;
+      addScore(50 + bonus);
+      let badgeBody = `+50 XP for matching case facts.`;
+      if (bonus > 0) badgeBody += ` <b>+${bonus} XP Combo Bonus!</b>`;
+      badge('Correct Assessment! 🎯', badgeBody, 'success');
+    } else { 
+      addScore(-10); 
+      badge('Assessment Mismatch ⚠️','Your rarity call was incorrect. -10 XP.', 'error', 3000); 
+      state.streak = 0; 
+    }
+    $('#streak').textContent = state.streak;
+    if (!localStorage.getItem('cai_insight_step2')) {
+        localStorage.setItem('cai_insight_step2','1');
+        showTransientInsight('#verbalOneLine', `The rarity you pick directly impacts the LR. Because this evidence is considered <b>${state.chosenRarity}</b> under the C̅ view, it provides <b>${state.band}</b> for the C view.`);
+    }
+    showNextStep('#step3'); renderVerbalChallenge();
+  };
+}
+
+function bandOptions(correct){
+  const all = ['limited support for C','moderate support for C','strong support for C', 'limited support for C̅', 'moderate support for C̅', 'strong support for C̅'];
+  const set=new Set([correct]);
+  while(set.size<3){ set.add(all[Math.floor(Math.random()*all.length)]); }
+  return [...set].sort(()=>Math.random()-0.5);
+}
+function renderVerbalChallenge(){
+  $('#progress-s3').classList.add('active');
+  const correct = state.band; const opts = bandOptions(correct);
+  $("#verbalChallenge").innerHTML = `<div class="mut">Pick the correct verbal statement (see Notebook 📓 if needed):</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">${opts.map(o=>`<button class="btn vopt">${o}</button>`).join('')}</div>`;
+  $('#reportBox').classList.add('hidden');
+
+  let firstTry=true;
+  document.querySelectorAll('.vopt').forEach(b=>b.onclick=(e)=>{
+    if(e.target.textContent===correct){
+      if(firstTry) {
+        addScore(15);
+        badge('Verbal Ninja! 🥷', '+15 XP bonus for first-try accuracy.', 'success');
+      } else {
+        addScore(5);
+      }
+      if (!localStorage.getItem('cai_insight_step3')) {
+          localStorage.setItem('cai_insight_step3','1');
+          showTransientInsight('#reportBox', `<b>Neutral Language is Key.</b> Notice the pre-drafted sentence avoids words like "guilty" or "innocent". Your job is only to state the strength of the scientific findings.`);
+      }
+      $("#verbalChallenge").classList.add('hidden'); $('#reportBox').classList.remove('hidden');
+      $("#sum").textContent = `Summary: ${state.band} (${state.side}). Write one neutral sentence.`;
+      setupReportBox();
+    } else { 
+      firstTry=false; addScore(-5); e.target.disabled=true; 
+      triggerShake(e.target);
+    }
+  });
+}
+
+const BADWORDS=/\b(guilt|guilty|innocen|innocent|convict|conviction|probability of guilt|crime|criminal)\b/i;
+function setupReportBox(){
+  function checks(){
+    const txt = ($("#freeText").value||'').trim();
+    const hasBand = /(limited|moderate|strong|support)/i.test(txt);
+    const hasSide = /(proposition|view)/i.test(txt);
+    const bad = BADWORDS.test(txt);
+    $("#freeText").classList.toggle('word-trap', bad);
+    $("#tBand").className = hasBand?'good':'bad'; $("#tSide").className = hasSide?'good':'bad'; $("#tNoOff").className = !bad?'good':'bad';
+    $("#submitCourt").disabled = !(hasBand && hasSide && !bad && txt.length > 0);
+  }
+  $("#autoDraft").onclick=()=>{
+    const propText = state.side === 'C' ? state.hp : state.hd;
+    $("#freeText").value = `The evidence provides ${state.band} for the proposition that "${propText.replace(/^(c|c̅)\s*:\s*/i, '').trim()}"`;
+    checks();
+  };
+  $("#freeText").oninput=checks; $("#freeText").value=''; checks();
+}
+
+$("#submitCourt").onclick=()=>{ 
+    addScore(50); 
+    note(`Final report submitted.`); 
+    badge('Evidence Submitted ✅','+50 XP for a neutral court report.', 'success'); 
+    endCase(); 
+};
+
+function endCase(){
+  show('#summary'); const lr = state.current.truth.lr;
+  $("#debriefMetrics").innerHTML = `XP: <b>${state.score}</b><br>Streak: <b>${state.streak}</b><br>Final LR: <b>${lr}</b>`;
+  const arm=$("#scaleArm"), mPrior=$("#mPrior"), mEvidence=$("#mEvidence");
+  const priorPos = v => v==='leansC' ? 70 : v==='leansCb' ? 30 : 50; const lrPos = lr => 50 + (Math.log10(lr) * 15);
+  mPrior.style.left = priorPos($("#priorSel").value) + '%'; mEvidence.style.left = lrPos(lr) + '%'; arm.style.transform='rotate(0deg)';
+  $("#priorSel").onchange = (e) => { mPrior.style.left = priorPos(e.target.value) + '%'; };
+  $("#applyTilt").onclick=()=>{ const priorAngle = v => v==='leansC' ? 6 : v==='leansCb' ? -6 : 0; const angle = priorAngle($("#priorSel").value) + (Math.log10(lr) * 8); arm.style.transform=`rotate(${angle}deg)`; };
+  $("#resetTilt").onclick=()=>{ arm.style.transform='rotate(0deg)'; };
+  if (!localStorage.getItem('cai_insight_summary')) {
+    localStorage.setItem('cai_insight_summary','1');
+    showTransientInsight('#applyTilt', `<b>Visualizing Bayes' Theorem:</b> The scales show how your evidence (the LR) sways the 'court's initial belief' (the prior). This is the formula in action: Posterior Odds = Prior Odds × LR.`);
+  }
+}
+
+/* ====== Click-through Overlay Tutor ====== */
+const Tour = (function(){
+  let steps = [], idx = 0, running = false, detachFns = [], lastElevatedCard = null;
+  const veil = $('#tourVeil'), hi = $('#tourHighlight'), card = $('#tourCard'), titleEl = $('#tourTitle'), textEl = $('#tourText'), btnNext = $('#tourNext'), btnBack = $('#tourBack'), btnSkip = $('#tourSkip');
+
+  function isRunning() { return running; }
+  function rectOf(el){ return el.getBoundingClientRect(); }
+  
+  function placeHighlight(el){
+    const r = rectOf(el);
+    const pad = 6;
+    hi.style.left = (r.left - pad) + 'px';
+    hi.style.top = (r.top - pad) + 'px';
+    hi.style.width = (r.width + pad*2) + 'px';
+    hi.style.height= (r.height + pad*2) + 'px';
+    hi.style.display='block';
+  }
+  
+  function placeCardNear(el){
+    const r = rectOf(el);
+    const margin = 20;
+    const cardW = card.offsetWidth;
+    const cardH = card.offsetHeight;
+    
+    let top, left;
+    top = r.bottom + margin;
+    left = r.left + (r.width / 2) - (cardW / 2);
+
+    if (top + cardH > window.innerHeight - margin) {
+        top = r.top - cardH - margin;
+    }
+
+    if (top < margin) {
+        top = r.top;
+        left = r.right + margin;
+        if (left + cardW > window.innerWidth - margin) {
+            left = r.left - cardW - margin;
+        }
+    }
+
+    left = Math.max(margin, Math.min(left, window.innerWidth - cardW - margin));
+    top = Math.max(margin, Math.min(top, window.innerHeight - cardH - margin));
+
+    card.style.top = top + 'px';
+    card.style.left = left + 'px';
+  }
+  
+  function scrollIntoViewIfNeeded(el){ 
+      const r = el.getBoundingClientRect(); 
+      if (r.top < 80 || r.bottom > window.innerHeight - 80){ 
+          el.scrollIntoView({behavior:'smooth', block:'center'}); 
+      } 
+  }
+
+  function cleanupAwaiters(){ 
+      detachFns.forEach(fn => { try { fn(); } catch(e){ console.error("Error in tour cleanup:", e) } }); 
+      detachFns = []; 
+  }
+  
+  function elevateCard(el) {
+      const parentCard = el.closest('.card, .soft, .hdr');
+      if (parentCard) {
+          parentCard.style.position = 'relative'; 
+          parentCard.style.zIndex = '1201';
+          lastElevatedCard = parentCard;
+      }
+  }
+
+  function awaitClick(sel, resolve){
+      const handler = (e)=>{
+          if (e.target.closest(sel)) {
+              document.documentElement.removeEventListener('click', handler, {capture:true});
+              setTimeout(resolve, 150);
+          }
+      };
+      document.documentElement.addEventListener('click', handler, {capture:true});
+      detachFns.push(()=>document.documentElement.removeEventListener('click', handler, {capture:true}));
+  }
+  
+  function awaitInputEquals(sel, expected, resolve){
+      const handler = (e) => {
+          if (e.target.matches(sel) && String(e.target.value).trim() === String(expected)) {
+              document.documentElement.removeEventListener('input', handler, {capture:true});
+              resolve();
+          }
+      };
+      document.documentElement.addEventListener('input', handler, {capture:true});
+      detachFns.push(() => document.documentElement.removeEventListener('input', handler, {capture:true}));
+  }
+
+  function awaitEnabledThenClick(sel, resolve){
+      const handler = (e) => {
+          const target = e.target.closest(sel);
+          if (target && !target.disabled) {
+              document.documentElement.removeEventListener('click', handler, { capture: true });
+              setTimeout(resolve, 200);
+          }
+      };
+      document.documentElement.addEventListener('click', handler, { capture: true });
+      detachFns.push(() => document.documentElement.removeEventListener('click', handler, { capture: true }));
+  }
+
+  function awaitCustom(checkFn, resolve){ 
+    const tick = setInterval(() => { 
+        try { 
+            if (checkFn()) { 
+                clearInterval(tick); 
+                resolve(); 
+            } 
+        } catch(e) { /* Element might not exist yet */ }
+    }, 100); 
+    detachFns.push(() => clearInterval(tick)); 
+  }
+
+  function showStep(i) {
+    const step = steps[i];
+    if (!step) { end(); return; }
+
+    const executeShow = () => {
+        cleanupAwaiters(); 
+        if (lastElevatedCard) {
+            lastElevatedCard.style.zIndex = '';
+            lastElevatedCard.style.position = '';
+            lastElevatedCard = null;
+        }
+
+        idx = i;
+        if (step.ensure) step.ensure();
+
+        const el = step.selector ? document.querySelector(step.selector) : null;
+
+        if (el && step.interactive) {
+            elevateCard(el);
+        }
+
+        veil.style.opacity = '1';
+        card.style.display = 'block';
+        setTimeout(() => card.classList.add('show'), 10);
+
+        btnBack.disabled = idx === 0;
+        titleEl.textContent = step.title || 'Guide';
+        textEl.innerHTML = step.text || '';
+
+        if (el) {
+            scrollIntoViewIfNeeded(el);
+            setTimeout(() => {
+                const currentEl = document.querySelector(step.selector);
+                if (currentEl) {
+                    placeHighlight(currentEl);
+                    placeCardNear(currentEl);
+                }
+            }, 350);
+        } else {
+            hi.style.display = 'none';
+            card.style.top = '120px';
+            card.style.left = 'calc(50% - 180px)';
+        }
+
+        const resolve = () => {
+            if (step.onResolve) step.onResolve();
+            next();
+        };
+        
+        if (step.wait) {
+            btnNext.textContent = 'Next (Hint)';
+            btnNext.onclick = () => { if (step.onHint) step.onHint(); };
+            
+            if (step.wait.type === 'click') awaitClick(step.wait.selector, resolve);
+            else if (step.wait.type === 'inputEquals') awaitInputEquals(step.wait.selector, step.wait.value, resolve);
+            else if (step.wait.type === 'enabledThenClick') awaitEnabledThenClick(step.wait.selector, resolve);
+            else if (step.wait.type === 'custom') awaitCustom(step.wait.check, resolve);
+        } else {
+            btnNext.textContent = (idx === steps.length - 1 ? 'Finish' : 'Next');
+            btnNext.onclick = next;
+        }
+
+        btnBack.onclick = back;
+        btnSkip.onclick = skip;
+        if (step.onShow) step.onShow(el);
+    };
+
+    if (step.delay) setTimeout(executeShow, step.delay);
+    else executeShow();
+  }
+
+  function next(){ cleanupAwaiters(); const s = steps[idx]; if (s && s.onNext) s.onNext(); if (idx < steps.length-1){ showStep(idx+1); } else { end(true); } }
+  function back(){ cleanupAwaiters(); if (idx>0){ showStep(idx-1); } }
+  function skip(){ end(true); }
+  function end(markDone=false){ 
+      running=false; 
+      cleanupAwaiters(); 
+      if (lastElevatedCard) {
+          lastElevatedCard.style.zIndex = '';
+          lastElevatedCard.style.position = '';
+          lastElevatedCard = null;
+      }
+      veil.style.opacity='0'; 
+      card.classList.remove('show'); 
+      setTimeout(()=>{ card.style.display='none'; hi.style.display='none';}, 300); 
+      if (markDone) localStorage.setItem('cai_seen_tour','1'); 
+  }
+
+  window.addEventListener('resize', ()=>{ if(running){ showStep(idx); } });
+  let scrollTimeout;
+  window.addEventListener('scroll', ()=>{ 
+    if(running){ 
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => showStep(idx), 150);
+    } 
+  }, {passive:true});
+
+  function start(def){ 
+    if(running) return; 
+    idx = 0;
+    steps = def; 
+    running=true; 
+    showStep(0); 
+  }
+  return { start, isRunning };
+})();
+
+function buildMainTour(){
+  return [
+    { ensure: () => show('#tutorial'), title:'Welcome!', text:'This guided tour will walk you through all the features of the simulator. Let\'s start with the header.' },
+    { ensure: () => show('#tutorial'), selector:'.kpis', title:'Your Progress', text:'Keep an eye on your <b>XP</b>, <b>Title</b>, and current correct answer <b>Streak</b> here.' },
+    { 
+      ensure: () => show('#tutorial'),
+      selector:'#notebookToggle', 
+      title:'Analyst\'s Notebook', 
+      text:'This is a key tool. Click it any time to review the verbal scale. <b>Click the highlighted button to continue the tour.</b>', 
+      wait:{ type:'click', selector:'#notebookToggle' }, 
+      onHint: () => { $('#notebookToggle').click(); },
+      onResolve:()=>{ if($('#analystNotebook').classList.contains('open')){$('#notebookToggle').click()}} 
+    },
+    { ensure: () => show('#tutorial'), selector:'#tutorialContent', title:'Introductory Slides', text:'First, you\'ll review the core theory. Click the real <b>Next</b> button below the slides to advance.' },
+    { 
+      ensure: () => show('#tutorial'),
+      selector:'#nextTutBtn', 
+      title:'Advance the Tutorial', 
+      text:'Use these buttons to navigate the slides.', 
+      wait:{ type:'click', selector:'#nextTutBtn' },
+      onHint: () => { $('#nextTutBtn').click(); }
+    },
+    { ensure: () => show('#tutorial'), selector:'#skipTutorialBtn', title:'Skip Ahead', text:'If you\'re already familiar with the theory, you can use this button to jump straight to the cases.' },
+    { 
+      ensure: () => show('#tutorial'),
+      selector:'#nextTutBtn', 
+      title:'Start the Guided Case', 
+      text:'On the last slide, this button will start a short, interactive example. Click it now.', 
+      wait:{ type:'custom', check:()=> !$('#guidedCase').classList.contains('hidden') }, 
+      onHint:()=>{ for(let i=currentTutorialStep; i<tutorialSteps.length; i++) {$('#nextTutBtn').click();} } 
+    },
+    { ensure: () => { show('#guidedCase'); if ($('#g-step1').classList.contains('hidden')) initGuidedCase(); }, selector:'#g-step1', title:'Read the Scenario', text:'First, read the case details. When ready, click <b>Continue</b>.', wait:{ type:'click', selector:'#g-step1 .btn.primary' }, onHint: () => { $('#g-step1 .btn.primary').click(); }, delay: 400 },
+    { ensure: () => show('#guidedCase'), selector:'#g-num-input', title:'The Numerator: P(E|C)', text:'What\'s the probability of the evidence if C is right? If the suspect IS the source, it\'s a guaranteed match. So the probability is <b>1</b>. Type it in.', wait:{ type:'inputEquals', selector:'#g-num-input', value:'1' }, interactive: true, delay: 550 },
+    { ensure: () => show('#guidedCase'), selector:'#g-den-input', title:'The Denominator: P(E|C̅)', text:'What are the odds of this evidence if C̅ is right (it\'s a random person)? The case gives this "random match probability" as <b>0.01</b>.', wait:{ type:'inputEquals', selector:'#g-den-input', value:'0.01' }, interactive: true, delay: 550 },
+    { ensure: () => show('#guidedCase'), selector:'#g-lr-input', title:'Calculate the Likelihood Ratio', text:'The LR is Numerator / Denominator (1 / 0.01). This tells us how much more likely the evidence is under C. Enter <b>100</b>.', wait:{ type:'inputEquals', selector:'#g-lr-input', value:'100' }, interactive: true, delay: 550 },
+    { ensure: () => show('#guidedCase'), selector:'#startCasesBtn', title:'Open the Case Files', text:'Excellent. You\'ve calculated your first LR. Click here to proceed to the main simulation.', wait:{ type:'click', selector:'#startCasesBtn' }, onHint: () => { $('#startCasesBtn').click(); }, delay: 550 },
+    { ensure:()=>{ show('#board'); setTimeout(renderBoard,50); }, selector:'#boardGrid', title:'Pick a Case', text:'This is the case cabinet. Click any tile to open its file and begin your analysis.', wait:{ type:'custom', check:()=> !$('#flow').classList.contains('hidden') }, delay: 400 },
+    { ensure:() => { if(!state.current) startCase(0, TILES[0]); show('#flow'); }, selector:'#IText', title:'1. Read the Case Details', text:'Read the context carefully. This information is crucial for framing your propositions correctly.', delay: 550 },
+    { ensure:() => show('#flow'), selector:'#proposition-box', title:'2. Frame Propositions', text:'Define C (prosecution view) and C̅ (defence view). They must be opposites! Use the template buttons or type your own.', wait:{ type:'custom', check:()=> !$('#submitProps').disabled }, interactive: true },
+    { ensure:() => show('#flow'), selector:'#submitProps', title:'3. Submit Propositions', text:'Once both boxes are filled, the submit button is enabled. Click it to lock in your propositions.', wait:{ type:'enabledThenClick', selector:'#submitProps' }, onHint: () => { $('#submitProps').click(); } },
+    { ensure:() => show('#flow'), selector:'.rarity', title:'4. Evaluate Evidence Rarity', text:'Objectively, how common is this evidence if the suspect is NOT the source (C̅)? Your choice here directly sets the LR.', wait:{ type:'custom', check:()=> !!state.chosenRarity }, delay: 550, interactive: true },
+    { ensure:() => show('#flow'), selector:'#verbalOneLine', title:'5. Review the LR', text:'Your rarity choice generates an LR and a corresponding verbal statement. Notice how "rare" evidence gives a high LR.' },
+    { ensure:() => show('#flow'), selector:'#scale', title:'The Jeffreys Bar', text:'This bar gives a quick visual indication of the LR\'s strength on a logarithmic scale. The marker shows where your current LR falls.' },
+    { ensure:() => show('#flow'), selector:'#lockQual', title:'6. Lock & Continue', text:'Happy with your assessment? Lock it in to proceed to the final reporting stage.', wait:{ type:'enabledThenClick', selector:'#lockQual' }, onHint: () => { $('#lockQual').click(); } },
+    { ensure:() => show('#flow'), selector:'#verbalChallenge', title:'7. Select Verbal Conclusion', text:'Now, prove you know the scale. Select the correct verbal statement from the list. Check your 📓 Notebook if you need a reminder!', wait:{ type:'custom', check:()=> !$('#reportBox').classList.contains('hidden') }, delay: 550, interactive: true },
+    { ensure:() => show('#flow'), selector:'#reportBox ul', title:'The Neutrality Checklist', text:'This checklist is vital. It ensures your final report is impartial and avoids "offence-level" language like "guilty" or "innocent".', delay: 400 },
+    { ensure:() => show('#flow'), selector:'#autoDraft', title:'Auto-Draft Helper', text:'Stuck? This button generates a perfectly neutral sentence based on your findings. It\'s a great way to learn.', wait:{ type:'click', selector:'#autoDraft' }, onHint: () => { $('#autoDraft').click(); }, onResolve:()=>{ if(!$('#freeText').value) $('#autoDraft').click(); } },
+    { ensure:() => show('#flow'), selector:'#freeText', title:'8. Write Your Report', text: 'Write or edit your one-sentence summary. Notice the checklist items turn green as you meet the criteria.', wait: {type: 'custom', check: ()=> !$('#submitCourt').disabled }, interactive: true },
+    { ensure:() => show('#flow'), selector:'#submitCourt', title:'9. Submit Report to Court', text:'When all checks are green, your report is ready. Submit your final, neutral findings to the court.', wait:{ type:'enabledThenClick', selector:'#submitCourt' }, onHint: () => { $('#submitCourt').click(); } },
+    { ensure:() => show('#summary'), selector:'#debriefMetrics', title:'Case Debrief', text:'Well done! Here you can review your performance, XP, and the final LR for the case.', delay: 400},
+    { ensure:() => show('#summary'), selector:'.scale-wrap', title:'The Scales of Justice', text:'This visualizes Bayes\' Theorem. It shows how your evidence (LR) combines with the court\'s starting belief (the "prior odds").' },
+    { ensure:() => show('#summary'), selector:'#applyTilt', title:'Apply Evidence Tilt', text:'Click this to see the "tilt". This demonstrates how Posterior Odds = Prior Odds × LR.', wait:{ type:'click', selector:'#applyTilt' }, onHint: () => { $('#applyTilt').click(); } },
+    { ensure:() => show('#summary'), selector:'#playAgain', title:'Start a New Case', text:'You\'ve completed the full guide! Click <b>New Board</b> to play again. You can restart this guide any time using the 🎓 button in the header.', onShow:()=>{$('#playAgain').classList.add('primary')} }
+  ];
+}
+
+
+function openSectionHelp(sectionKey){ const cfg = helpContent[sectionKey]; if (cfg) openModal(cfg.title, cfg.content); }
+function showTransientInsight(selector, html){
+  if (Tour.isRunning()) return; // Suppress insights if tour is active
+  const t = document.createElement('div'); t.className = 'toast show'; t.style.position='absolute';
+  const target = document.querySelector(selector); if (!target) return;
+  const r = target.getBoundingClientRect();
+  t.style.left = (r.left + window.scrollX) +'px'; t.style.top  = (r.bottom + 8 + window.scrollY) +'px';
+  t.style.zIndex = 1100; t.style.maxWidth = '300px';
+  t.innerHTML = `<b>💡 Insight</b><div class="mut">${html}</div>`;
+  document.body.appendChild(t);
+  setTimeout(()=>{ t.classList.remove('show'); setTimeout(()=>t.remove(),300); }, 4500);
+}
+
+/* ====== Init ====== */
+document.addEventListener('DOMContentLoaded', () => {
+  $('#nextTutBtn').onclick = () => { if (currentTutorialStep < tutorialSteps.length - 1) { currentTutorialStep++; renderTutorialStep(currentTutorialStep); } else { show('#guidedCase'); initGuidedCase(); } };
+  $('#prevTutBtn').onclick = () => { if (currentTutorialStep > 0) { currentTutorialStep--; renderTutorialStep(currentTutorialStep); } };
+  $('#skipTutorialBtn').onclick = () => { show('#board'); setTimeout(renderBoard, 50); };
+  $('#startCasesBtn').onclick = () => { show('#board'); setTimeout(renderBoard, 50); };
+  document.body.addEventListener('click', e => {
+    if (e.target.classList.contains('sectionHow')) { openSectionHelp(e.target.getAttribute('data-section')); }
+    if (e.target.classList.contains('help-btn')) { const topic = e.target.dataset.topic; if (helpContent[topic]) openModal(helpContent[topic].title, helpContent[topic].content); }
+  });
+  $("#resetBtn").onclick = () => {
+    openConfirmModal(
+        '🤔 Confirm Reset',
+        '<p>Are you sure you want to reset all progress? This action cannot be undone.</p>',
+        () => {
+            localStorage.clear();
+            fullReset();
+            badge('Progress Reset', 'The simulator has been reset to its initial state.', 'default');
+        }
+    );
+  };
+  $("#notebookToggle").onclick=()=>$("#analystNotebook").classList.toggle('open');
+  
+  $("#playAgain").onclick=()=>{
+    const score = state.score;
+    const streak = state.streak;
+    const title = $('#analystTitle').textContent;
+    state = freshState();
+    state.score = score;
+    state.streak = streak;
+    $('#score').textContent = state.score;
+    $('#streak').textContent = state.streak;
+    $('#analystTitle').textContent = title;
+    show('#board'); 
+    setTimeout(renderBoard, 50);
+    setHost('Select a new case to begin.');
+  };
+
+  $("#startTourBtn").onclick=()=> Tour.start(buildMainTour());
+  $("#scalesHelpBtn").onclick=()=> openModal('⚖️ What is this?', `<p>This visualizes a simplified version of Bayes' Theorem: <b>Posterior Odds = Prior Odds × LR</b>.</p><ul class="mut"><li><b>Prior:</b> The court's belief *before* hearing your evidence.</li><li><b>Evidence (LR):</b> Your finding. An LR of 100 means the evidence is 100x more likely if C is true.</li><li><b>Posterior:</b> The new odds after considering your evidence.</li></ul>`);
+
+  fullReset();
+  if (!localStorage.getItem('cai_seen_tour')){ setTimeout(()=>{ Tour.start(buildMainTour()); }, 400); }
+});
+</script>
+</body>
+</html>
