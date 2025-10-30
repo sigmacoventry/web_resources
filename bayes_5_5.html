@@ -1,0 +1,1220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Bayesian Sandbox</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Using a Google Font for better typography */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+        
+        /* Animation and Transition Styles */
+        .fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .gauge-bar { transition: width 0.7s cubic-bezier(0.25, 0.8, 0.25, 1); }
+        .gauge-highlight { animation: gaugeHighlight 0.6s ease-out; }
+        @keyframes gaugeHighlight { 0% { transform: scaleX(0); } 50% { transform: scaleX(1); } 100% { transform: scaleX(0); } }
+        
+        .modal-backdrop { animation: fadeInBackdrop 0.3s ease-out forwards; }
+        @keyframes fadeInBackdrop { from { background-color: rgba(15, 23, 42, 0); } to { background-color: rgba(15, 23, 42, 0.5); } }
+        
+        .modal-content { animation: fadeInModal 0.3s ease-out forwards; }
+        @keyframes fadeInModal { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        
+        .value-pulse { animation: valuePulse 0.6s ease-out; }
+        @keyframes valuePulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+
+        /* Juice animations for feedback */
+        @keyframes value-increase { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.25); color: #16a34a; } }
+        @keyframes value-decrease { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.25); color: #dc2626; } }
+        .value-increase { animation: value-increase 0.7s ease-out; }
+        .value-decrease { animation: value-decrease 0.7s ease-out; }
+
+        /* Custom Slider Styles */
+        input[type=range] { -webkit-appearance: none; background: transparent; }
+        input[type=range]:focus { outline: none; }
+        input[type=range]::-webkit-slider-runnable-track { height: 8px; cursor: pointer; background: #e2e8f0; border-radius: 9999px; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 24px; width: 24px; border-radius: 50%; background: #2563eb; cursor: pointer; margin-top: -8px; border: 3px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+        
+        /* Tooltip and Highlighting Styles */
+        .tooltip-container { position: relative; display: inline-block; }
+        .tooltip-trigger { cursor: help; }
+        .tooltip-text { visibility: hidden; width: 220px; background-color: #1e293b; color: #fff; text-align: center; border-radius: 6px; padding: 8px; position: absolute; z-index: 1; bottom: 125%; left: 50%; margin-left: -110px; opacity: 0; transition: opacity 0.3s; }
+        .tooltip-container:hover .tooltip-text { visibility: visible; opacity: 1; }
+        
+        /* Tutorial Styles */
+        .tutorial-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 40; }
+        .tutorial-highlight { box-shadow: 0 0 0 9999px rgba(0,0,0,0.6), 0 0 15px 5px #fde047; border-radius: 8px; position: relative; z-index: 50; transition: all 0.3s ease; }
+        .tutorial-modal { position: fixed; z-index: 50; background: white; padding: 1.5rem; border-radius: 0.75rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); max-width: 350px; }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800">
+    <div id="app" class="max-w-6xl mx-auto p-4 md:p-8"></div>
+    <div id="sticky-footer" class="hidden"></div>
+    <div id="tutorial-container"></div>
+
+    <script>
+        // --- DATA AND CONFIGURATION ---
+        const DEFAULT_SCENARIO = {
+            id: "bird",
+            title: "The Azure Jay of the Valley 🏞️",
+            briefing: "You're an ecologist searching a remote valley for the Azure Jay 🐦, a bird thought to be extinct. Your goal is to become confident the bird is present before your research grant runs out.",
+            hypotheses: [{ id: "H", label: "Jay is Present" }, { id: "~H", label: "Jay is Absent" }],
+            evidence: [
+                { id: "tracks", label: "Scout for Tracks 🐾", cost: 1, hint: "Cheap, but tracks can be misleading.", icon: '🐾', requiredPosterior: 0, chanceOfFailure: 0, correlation: 0.5, outcomes: [
+                    { id: "jay_tracks", label: "You find tracks consistent with the Azure Jay.", p_given: { H: 0.40, "~H": 0.15 } },
+                    { id: "other_tracks", label: "You find tracks from other common birds.", p_given: { H: 0.60, "~H": 0.85 } }
+                ]},
+                { id: "camera", label: "Deploy Camera Traps 📸", cost: 2, hint: "Expensive, but a clear photo is undeniable.", icon: '📷', requiredPosterior: 0, chanceOfFailure: 0.05, correlation: 0.3, outcomes: [
+                    { id: "photo_clear", label: "A clear, unmistakable photo of the Azure Jay.", p_given: { H: 0.30, "~H": 0.01 } },
+                    { id: "photo_amb", label: "An ambiguous photo of a blue-feathered bird.", p_given: { H: 0.20, "~H": 0.05 } },
+                    { id: "no_photo", label: "The cameras captured nothing of note.", p_given: { H: 0.50, "~H": 0.94 } }
+                ]},
+                { id: "expedition", label: "Launch Full Expedition 🚁", cost: 3, hint: "High cost, high reward.", icon: '🚁', requiredPosterior: 0.50, chanceOfFailure: 0.1, correlation: 0.1, outcomes: [
+                    { id: "sighting", label: "The expedition team makes a confirmed visual sighting!", p_given: { H: 0.60, "~H": 0.02 } },
+                    { id: "nest", label: "An old, abandoned nest is found, but its origin is uncertain.", p_given: { H: 0.20, "~H": 0.10 } },
+                    { id: "nothing", label: "The full search of the area turns up nothing conclusive.", p_given: { H: 0.20, "~H": 0.88 } }
+                ]}
+            ],
+            constraints: { budget: 5, target_posterior: 0.85, max_turns: 7, initial_prior: 0.05 },
+            targetHyp: "H"
+        };
+        
+        const MEDICAL_SCENARIO = {
+            id: "medical",
+            title: "Diagnosing a Rare Disease 🩺",
+            briefing: "You are a doctor faced with a patient who might have 'Cerebellitis Livida', a rare but treatable neurological condition. You must diagnose them correctly before they are discharged.",
+            hypotheses: [{ id: "H", label: "Disease is Present" }, { id: "~H", label: "Disease is Absent" }],
+            evidence: [
+                { id: "blood_test", label: "Cheap Blood Test 🩸", cost: 1, hint: "A quick screening, but known for false positives.", icon: '🩸', requiredPosterior: 0, chanceOfFailure: 0.02, correlation: 0.6, outcomes: [
+                    { id: "positive", label: "Test is positive for key inflammatory markers.", p_given: { H: 0.80, "~H": 0.10 } },
+                    { id: "negative", label: "Test is negative.", p_given: { H: 0.20, "~H": 0.90 } }
+                ]},
+                { id: "history", label: "Review Patient History 📜", cost: 2, hint: "Family and travel history can reveal risk factors.", icon: '📜', requiredPosterior: 0, chanceOfFailure: 0, correlation: 0.4, outcomes: [
+                    { id: "high_risk", label: "Patient has several known risk factors.", p_given: { H: 0.60, "~H": 0.20 } },
+                    { id: "low_risk", label: "Patient has no known risk factors.", p_given: { H: 0.40, "~H": 0.80 } }
+                ]},
+                { id: "mri", label: "Expensive MRI Scan 🧠", cost: 4, hint: "The gold standard for diagnosis, but very costly.", icon: '🧠', requiredPosterior: 0.30, chanceOfFailure: 0.05, correlation: 0.1, outcomes: [
+                    { id: "lesions", label: "MRI shows characteristic lesions.", p_given: { H: 0.90, "~H": 0.02 } },
+                    { id: "anomaly", label: "An ambiguous anomaly is detected.", p_given: { H: 0.08, "~H": 0.10 } },
+                    { id: "clear", label: "The scan is completely clear.", p_given: { H: 0.02, "~H": 0.88 } }
+                ]}
+            ],
+            constraints: { budget: 6, target_posterior: 0.90, max_turns: 5, initial_prior: 0.10 },
+            targetHyp: "H"
+        };
+
+        const COURTROOM_SCENARIO = {
+            id: "courtroom",
+            title: "The Case of the Missing Diamond ⚖️",
+            briefing: "You are a prosecutor building a case against a suspect for a diamond heist. You have a limited budget to conduct investigations and must be confident of their guilt before going to trial.",
+            hypotheses: [{ id: "H", label: "Suspect is Guilty" }, { id: "~H", label: "Suspect is Not Guilty" }],
+            evidence: [
+                { id: "witness", label: "Interview Eyewitness 🎤", cost: 1, hint: "Eyewitnesses can be powerful, but also unreliable.", icon: '🎤', requiredPosterior: 0, chanceOfFailure: 0, correlation: 0.7, outcomes: [
+                    { id: "positive_id", label: "Witness positively identifies the suspect.", p_given: { H: 0.70, "~H": 0.25 } },
+                    { id: "uncertain_id", label: "Witness is uncertain.", p_given: { H: 0.20, "~H": 0.50 } },
+                    { id: "wrong_person", label: "Witness describes someone else.", p_given: { H: 0.10, "~H": 0.25 } }
+                ]},
+                { id: "alibi", label: "Investigate Alibi 🗓️", cost: 2, hint: "Checking the suspect's alibi could make or break the case.", icon: '🗓️', requiredPosterior: 0, chanceOfFailure: 0.05, correlation: 0.3, outcomes: [
+                    { id: "alibi_disproven", label: "The alibi is proven false.", p_given: { H: 0.50, "~H": 0.05 } },
+                    { id: "alibi_weak", label: "The alibi is weak or uncorroborated.", p_given: { H: 0.30, "~H": 0.45 } },
+                    { id: "alibi_confirmed", label: "The alibi is confirmed by a reliable source.", p_given: { H: 0.20, "~H": 0.50 } }
+                ]},
+                { id: "dna", label: "Run DNA Analysis 🧬", cost: 5, hint: "DNA is strong evidence, but labs are expensive.", icon: '🧬', requiredPosterior: 0.40, chanceOfFailure: 0.1, correlation: 0.1, outcomes: [
+                    { id: "match", label: "DNA from the scene matches the suspect.", p_given: { H: 0.95, "~H": 0.01 } },
+                    { id: "no_match", label: "DNA does not match the suspect.", p_given: { H: 0.02, "~H": 0.89 } },
+                    { id: "inconclusive", label: "The sample was contaminated or inconclusive.", p_given: { H: 0.03, "~H": 0.10 } }
+                ]}
+            ],
+            constraints: { budget: 7, target_posterior: 0.95, max_turns: 4, initial_prior: 0.25 },
+            targetHyp: "H"
+        };
+        
+        const ARCHAEOLOGY_SCENARIO = {
+            id: "archaeology",
+            title: "The Dig at Whispering Mounds 🏺",
+            briefing: "You are an archaeologist leading a dig at a site contested by two theories: is it a wealthy Roman villa, or an Iron Age Celtic settlement? Your funding depends on making a confident assessment.",
+            hypotheses: [{ id: "H", label: "Roman Villa" }, { id: "~H", label: "Celtic Settlement" }],
+            evidence: [
+                { id: "pottery", label: "Analyze Pottery Shards", cost: 1, hint: "Common pottery is found everywhere, but high-quality Samian ware is a Roman hallmark.", icon: '🏺', requiredPosterior: 0, chanceOfFailure: 0, correlation: 0.6, outcomes: [
+                    { id: "samian_ware", label: "High-quality Samian ware is unearthed.", p_given: { H: 0.60, "~H": 0.05 } },
+                    { id: "coarse_ware", label: "Common coarse earthenware is found.", p_given: { H: 0.40, "~H": 0.95 } }
+                ]},
+                { id: "coins", label: "Examine Discovered Coins", cost: 2, hint: "Coins provide clear dating, but are rare finds.", icon: '🪙', requiredPosterior: 0, chanceOfFailure: 0.1, correlation: 0.2, outcomes: [
+                    { id: "roman_denarii", label: "Silver Denarii from the Flavian dynasty are found.", p_given: { H: 0.50, "~H": 0.01 } },
+                    { id: "celtic_staters", label: "Gold Staters from a local tribe are found.", p_given: { H: 0.02, "~H": 0.30 } },
+                    { id: "no_coins", label: "The metal detectors find nothing but old nails.", p_given: { H: 0.48, "~H": 0.69 } }
+                ]},
+                { id: "gpr", label: "Run Ground-Penetrating Radar", cost: 4, hint: "Very expensive, but can reveal the layout of buried structures.", icon: '📡', requiredPosterior: 0.40, chanceOfFailure: 0.05, correlation: 0.1, outcomes: [
+                    { id: "mosaic_foundations", label: "GPR reveals rectangular foundations with signs of a hypocaust and mosaic floors.", p_given: { H: 0.85, "~H": 0.10 } },
+                    { id: "roundhouse_imprints", label: "GPR reveals circular imprints characteristic of a Celtic roundhouse.", p_given: { H: 0.10, "~H": 0.70 } },
+                    { id: "inconclusive_geology", label: "The geological data is too noisy for a clear interpretation.", p_given: { H: 0.05, "~H": 0.20 } }
+                ]}
+            ],
+            constraints: { budget: 6, target_posterior: 0.90, max_turns: 5, initial_prior: 0.30 },
+            targetHyp: "H"
+        };
+
+        const SCENARIOS = {
+            "bird": DEFAULT_SCENARIO,
+            "medical": MEDICAL_SCENARIO,
+            "courtroom": COURTROOM_SCENARIO,
+            "archaeology": ARCHAEOLOGY_SCENARIO // This is the new line
+        };
+
+        // --- GLOBAL STATE ---
+        let appState = 'setup'; // 'setup', 'editor', 'playing', 'sandbox'
+        let selectedScenarioId = 'bird';
+        let customScenario = JSON.parse(localStorage.getItem('bayesScenario')) || JSON.parse(JSON.stringify(SCENARIOS[selectedScenarioId]));
+        let gameState = null;
+        let turnResult = null;
+        let rng;
+        let selectedTests = [];
+
+        // --- HELPER & MATH FUNCTIONS ---
+        const odds = p => p / (1 - p);
+        const fromOdds = o => o / (1 + o);
+        const pct = (x, d = 1) => (100 * x).toFixed(d) + '%';
+        const formatOdds = p => { const o = odds(p); if (o < 1) return `1:${(1/o).toFixed(1)}`; return `${o.toFixed(1)}:1`; };
+        function mulberry32(a) { let seed = a; return function() { let t = seed += 0x6D2B79F5; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; } }
+        const getLr = (outcome, scenario) => { const [h, nh] = [scenario.targetHyp, scenario.hypotheses.find(hyp => hyp.id !== scenario.targetHyp).id]; return outcome.p_given[h] / Math.max(outcome.p_given[nh], 1e-12); };
+        const getLrInterpretation = (lr) => { if (lr > 10) return { text: "Very Strong FOR", color: "text-green-600"}; if (lr > 3) return { text: "Strong FOR", color: "text-green-500"}; if (lr > 1.5) return { text: "Moderate FOR", color: "text-green-500"}; if (lr > 1) return { text: "Weak FOR", color: "text-green-400"}; if (lr === 1) return { text: "Uninformative", color: "text-slate-500"}; if (lr > 1/1.5) return { text: "Weak AGAINST", color: "text-red-400"}; if (lr > 1/3) return { text: "Moderate AGAINST", color: "text-red-500"}; if (lr > 1/10) return { text: "Strong AGAINST", color: "text-red-500"}; return { text: "Very Strong AGAINST", color: "text-red-600"}; };
+        const getPriorPersona = (p) => { if (p < 0.2) return "Skeptic"; if (p < 0.4) return "Outsider"; if (p < 0.6) return "50/50"; if (p < 0.8) return "Inclined"; return "Believer"; };
+        
+        // --- CORE GAME LOGIC ---
+        function startGame(seed, priorOverride = null) {
+            const isCustom = document.getElementById('scenario-editor-form') !== null;
+            const initialPrior = priorOverride !== null ? priorOverride : (isCustom ? customScenario.constraints.initial_prior : parseFloat(document.getElementById('prior-slider').value));
+            const currentSeed = seed || Date.now();
+            rng = mulberry32(currentSeed);
+            const scenario = isCustom ? customScenario : SCENARIOS[selectedScenarioId];
+            
+            const groundTruthSelector = document.querySelector('input[name="groundTruth"]:checked');
+            const groundTruthSelection = groundTruthSelector ? groundTruthSelector.value : 'Random';
+
+            const [h, nh] = [scenario.targetHyp, scenario.hypotheses.find(hyp => hyp.id !== scenario.targetHyp).id];
+            let truth;
+            if (groundTruthSelection === 'H') truth = h;
+            else if (groundTruthSelection === '~H') truth = nh;
+            else truth = rng() <= scenario.constraints.initial_prior ? h : nh;
+            
+            gameState = { 
+                scenario, 
+                priors: { [h]: initialPrior, [nh]: 1 - initialPrior },
+                post: { [h]: initialPrior, [nh]: 1 - initialPrior },
+                truth, 
+                targetHyp: h, 
+                budget: scenario.constraints.budget, 
+                spent: 0, 
+                turn: 0, 
+                history: [], 
+                seed: currentSeed,
+                testRepetitions: {}
+            };
+            
+            turnResult = null;
+            selectedTests = [];
+            appState = 'playing';
+            renderApp();
+            
+            setTimeout(() => {
+                const gaugeBar = document.getElementById('gauge-bar');
+                if (gaugeBar) gaugeBar.style.width = pct(initialPrior, 0);
+                if (!localStorage.getItem('bayesTutorialCompleted')) {
+                    startTutorial();
+                }
+            }, 100);
+        }
+
+        function runSelectedTests() {
+            if (selectedTests.length === 0) return;
+            let turnData = { pre: { ...gameState.post }, post: { ...gameState.post }, actions: [], netLr: 1, cost: 0 };
+            let cumulativeCost = 0;
+            
+            selectedTests.forEach(testId => {
+                const ev = gameState.scenario.evidence.find(e => e.id === testId);
+                cumulativeCost += ev.cost;
+                gameState.testRepetitions[testId] = (gameState.testRepetitions[testId] || 0) + 1;
+
+                if (rng() < ev.chanceOfFailure) {
+                    turnData.actions.push({ ev, out: { label: "Test Failure" }, lrEff: 1, pre: { ...turnData.post }, post: { ...turnData.post }, failed: true });
+                    return;
+                }
+
+                const dist = {};
+                ev.outcomes.forEach(o => dist[o.id] = o.p_given[gameState.truth]);
+                const r = rng();
+                let cum = 0;
+                let out;
+                for (const outcomeId in dist) { cum += dist[outcomeId]; if (r <= cum) { out = ev.outcomes.find(o => o.id === outcomeId); break; } }
+                if (!out) out = ev.outcomes.slice(-1)[0];
+                
+                const currentPre = { ...turnData.post };
+                const lr = getLr(out, gameState.scenario);
+                
+                const repeats = gameState.testRepetitions[testId];
+                const correlation = ev.correlation || 0;
+                const penalty = (1 - correlation * (repeats - 1) / repeats);
+                const lrEff = Math.exp(Math.log(lr) * (repeats > 1 ? penalty : 1));
+
+                turnData.netLr *= lrEff;
+                const postOdds = odds(currentPre[gameState.targetHyp]) * lrEff;
+                const newPostProb = fromOdds(postOdds);
+                const [h, nh] = [gameState.targetHyp, gameState.scenario.hypotheses.find(hyp => hyp.id !== gameState.targetHyp).id];
+                const newPost = { [h]: newPostProb, [nh]: 1 - newPostProb };
+                // Include hadCorrelationPenalty boolean
+                turnData.actions.push({ ev, out, lr, lrEff, pre: currentPre, post: newPost, repeats, hadCorrelationPenalty: (lrEff !== lr && repeats > 1) });
+                turnData.post = newPost;
+            });
+            
+            turnData.cost = cumulativeCost;
+            turnResult = turnData;
+            gameState.post = turnData.post;
+            gameState.spent += cumulativeCost;
+            gameState.turn += 1;
+            gameState.history.push(turnResult);
+            selectedTests = [];
+            
+            localStorage.setItem('bayesLastRun', JSON.stringify({ scenario: customScenario, gameState }));
+
+            // Animation direction support
+            const preProbForAnim = turnResult.pre[gameState.targetHyp];
+            const postProbForAnim = turnResult.post[gameState.targetHyp];
+            window.lastUpdateDirection = postProbForAnim > preProbForAnim ? 'increase' : (postProbForAnim < preProbForAnim ? 'decrease' : 'none');
+
+            renderApp();
+        }
+
+        function rewindTurn() {
+            if (!gameState || gameState.history.length === 0) return;
+            gameState.history.pop();
+            gameState.turn -= 1;
+            
+            if (gameState.history.length > 0) {
+                const lastTurn = gameState.history[gameState.history.length - 1];
+                gameState.post = { ...lastTurn.post };
+            } else {
+                gameState.post = { ...gameState.priors };
+            }
+
+            gameState.spent = gameState.history.reduce((total, turn) => total + turn.cost, 0);
+            
+            turnResult = null;
+            renderApp();
+        }
+
+        // --- RENDERING FUNCTIONS ---
+        function renderSetupScreen() {
+            const scenario = SCENARIOS[selectedScenarioId];
+            const initialPrior = scenario.constraints.initial_prior;
+            const hypothesisLabel = scenario.hypotheses.find(h => h.id === scenario.targetHyp).label;
+            
+            const scenarioOptionsHTML = Object.values(SCENARIOS).map(s => `
+                <label class="py-2 px-4 rounded-lg bg-white border border-slate-300 has-[:checked]:bg-indigo-100 has-[:checked]:border-indigo-500 cursor-pointer transition-colors">
+                    <input type="radio" name="scenarioChoice" value="${s.id}" class="sr-only" onchange="selectScenario(this.value)" ${selectedScenarioId === s.id ? 'checked' : ''}>
+                    ${s.title}
+                </label>
+            `).join('');
+
+            document.getElementById('app').innerHTML = `<header class="text-center mb-8"><h1 class="text-4xl font-extrabold text-slate-900">Interactive Bayesian Sandbox</h1></header>
+                <div class="bg-white/80 backdrop-blur-md p-8 rounded-2xl shadow-lg border border-slate-200 text-center fade-in">
+                    <h2 class="text-xl font-bold text-slate-800">1. Choose Your Scenario</h2>
+                    <div class="flex flex-wrap justify-center gap-2 my-4">${scenarioOptionsHTML}</div>
+
+                    <div id="scenario-details">
+                        <h3 class="text-2xl font-bold text-slate-900 mt-4">${scenario.title}</h3>
+                        <p class="text-slate-600 max-w-2xl mx-auto mt-2">${scenario.briefing}</p>
+
+                        <h2 class="text-xl font-bold text-slate-800 mt-8">2. Set Your Starting Belief</h2>
+                        <p class="text-slate-500 mt-2 mb-6">Before gathering any evidence, how likely do you think it is that the hypothesis <b class="text-slate-700">'${hypothesisLabel}'</b> is true?</p>
+                        <div class="max-w-lg mx-auto">
+                            <div id="prior-value-display" class="text-4xl font-bold text-blue-600 mb-2">${pct(initialPrior)}</div>
+                            <div id="prior-persona-display" class="font-semibold text-slate-600 h-6 mb-1">${getPriorPersona(initialPrior)}</div>
+                            <input type="range" id="prior-slider" min="0.01" max="0.99" step="0.01" value="${initialPrior}" class="w-full" oninput="updatePriorDisplay(this.value)">
+                            <div class="flex justify-between text-xs text-slate-500 mt-1 px-2"><span>Skeptic</span><span>50/50</span><span>Believer</span></div>
+                            <div id="prior-odds-display" class="text-sm text-slate-500 mt-6">= ${formatOdds(initialPrior)} odds</div>
+                        </div>
+
+                        <h2 class="text-xl font-bold text-slate-800 mt-10">3. Set the Ground Truth (for this simulation)</h2>
+                        <p class="text-slate-500 mt-2 mb-4">What is the actual reality for this mission?</p>
+                        <div id="truth-selector" class="flex justify-center gap-2">
+                            <label class="py-2 px-4 rounded-lg bg-white border border-slate-300 has-[:checked]:bg-blue-100 has-[:checked]:border-blue-500 cursor-pointer transition-colors"><input type="radio" name="groundTruth" value="H" class="sr-only"> Hypothesis is True</label>
+                            <label class="py-2 px-4 rounded-lg bg-white border border-slate-300 has-[:checked]:bg-red-100 has-[:checked]:border-red-500 cursor-pointer transition-colors"><input type="radio" name="groundTruth" value="~H" class="sr-only"> Hypothesis is False</label>
+                            <label class="py-2 px-4 rounded-lg bg-white border border-slate-300 has-[:checked]:bg-slate-200 has-[:checked]:border-slate-500 cursor-pointer transition-colors"><input type="radio" name="groundTruth" value="Random" class="sr-only" checked> Random</label>
+                        </div>
+                    </div>
+                    <div class="mt-10 flex justify-center items-center gap-4 flex-wrap">
+                        <button onclick="appState = 'sandbox'; renderApp();" class="py-2 px-6 rounded-lg bg-amber-500 hover:bg-amber-600 font-semibold text-white transition-colors">Sandbox Mode 🧪</button>
+                        <button onclick="appState = 'editor'; renderApp();" class="py-2 px-6 rounded-lg bg-slate-200 hover:bg-slate-300 font-semibold text-slate-700 transition-colors">Edit Scenario 🛠️</button>
+                        <button onclick="startGame()" class="py-2 px-6 rounded-lg bg-blue-600 hover:bg-blue-700 font-semibold text-white transition-colors text-lg">Start Mission 🚀</button>
+                    </div>
+                </div>`;
+        }
+        
+        function selectScenario(id) {
+            selectedScenarioId = id;
+            customScenario = JSON.parse(JSON.stringify(SCENARIOS[selectedScenarioId]));
+            renderSetupScreen();
+        }
+
+        function updatePriorDisplay(value) {
+            const p = parseFloat(value);
+            document.getElementById('prior-value-display').textContent = pct(p);
+            document.getElementById('prior-persona-display').textContent = getPriorPersona(p);
+            document.getElementById('prior-odds-display').textContent = `= ${formatOdds(p)} odds`;
+        }
+        
+        function renderGauge(value, target, unlock) { 
+            const hypothesisLabel = gameState?.scenario.hypotheses.find(h => h.id === gameState.targetHyp).label || "Hypothesis";
+            return `<div id="gauge-container" class="bg-white/80 backdrop-blur-md p-6 rounded-2xl shadow-lg border border-slate-200">
+                <div class="flex justify-between items-end mb-1"><span class="text-sm font-medium text-slate-600">Confidence in '${hypothesisLabel}':</span><span id="confidence-pct" class="text-2xl font-bold text-slate-800">${pct(value)}</span></div>
+                <div class="w-full bg-slate-200 rounded-full h-4 relative overflow-hidden">
+                    <div id="gauge-bar" class="bg-blue-600 h-4 rounded-full relative gauge-bar" style="width: ${appState === 'setup' ? '0%' : pct(value, 0)}"></div>
+                    <div class="absolute inset-0 flex items-center">
+                        ${unlock > 0 ? `<div style="left: ${pct(unlock,0)}" class="absolute top-0 bottom-0 w-0.5 bg-amber-400" title="Unlocks special test"></div>` : ''}
+                        <div style="left: ${pct(target,0)}" class="absolute top-0 bottom-0 w-0.5 bg-green-500" title="Target Confidence"></div>
+                    </div>
+                </div>
+            </div>`; 
+        }
+
+        function renderStatusPills(budget, spent, turn, maxTurns) { 
+            return `<div id="status-container" class="bg-white/80 backdrop-blur-md p-6 rounded-2xl shadow-lg border border-slate-200 space-y-3">
+                <h3 class="font-bold text-center mb-4">Mission Status 📊</h3>
+                <div class="flex flex-wrap justify-center gap-2">
+                    <div class="flex items-center gap-2 bg-white rounded-full px-3 py-1.5 text-sm shadow-sm border border-slate-200"><span class="font-medium text-slate-600">Budget 💰:</span><b id="budget-value" class="font-bold text-slate-800 inline-block px-1 rounded">${budget - spent}</b><span> / ${budget}</span></div>
+                    <div class="flex items-center gap-2 bg-white rounded-full px-3 py-1.5 text-sm shadow-sm border border-slate-200"><span class="font-medium text-slate-600">Turn ⏳:</span><b id="turn-value" class="font-bold text-slate-800 inline-block px-1 rounded">${turn}</b><span> / ${maxTurns}</span></div>
+                </div>
+                <div id="turn-lr-display" class="text-center font-semibold text-slate-600 h-6 pt-2"></div>
+            </div>`; 
+        }
+        
+        function renderEvidenceChoices(scenario, spent, budget, posterior) {
+            const testsHTML = scenario.evidence.map((ev, index) => {
+                const isLocked = ev.requiredPosterior && posterior < ev.requiredPosterior;
+                const isSelected = selectedTests.includes(ev.id);
+                const lrs = ev.outcomes.map(o => getLr(o, scenario));
+                const medianAbsLogLr = lrs.map(lr => Math.abs(Math.log(lr))).sort((a,b)=>a-b)[Math.floor(lrs.length/2)];
+                const valuePerCost = medianAbsLogLr / ev.cost;
+                
+                const outcomesHTML = ev.outcomes.map(o => {
+                    const p_h = o.p_given.H;
+                    const p_nh = o.p_given['~H'];
+                    return `
+                    <div class="mt-2 p-2 bg-slate-50 rounded">
+                        <p class="text-xs text-slate-700">"${o.label}"</p>
+                        <div class="space-y-1 mt-1">
+                            <div class="flex items-center gap-2 text-xs">
+                                <span class="w-16 text-blue-700">P(E|H)</span>
+                                <div class="w-full bg-blue-100 rounded-full h-3"><div class="bg-blue-400 h-3 rounded-full" style="width:${pct(p_h, 0)}"></div></div>
+                                <span class="w-10 font-mono text-right">${pct(p_h,0)}</span>
+                            </div>
+                            <div class="flex items-center gap-2 text-xs">
+                                <span class="w-16 text-red-700">P(E|~H)</span>
+                                <div class="w-full bg-red-100 rounded-full h-3"><div class="bg-red-400 h-3 rounded-full" style="width:${pct(p_nh, 0)}"></div></div>
+                                <span class="w-10 font-mono text-right">${pct(p_nh,0)}</span>
+                            </div>
+                        </div>
+                    </div>`;
+                }).join('');
+
+                return `<div class="${isLocked ? 'opacity-50' : ''}">
+                    <div id="test-card-${ev.id}" class="w-full text-left p-4 bg-white rounded-lg shadow-md border ${isSelected ? 'border-blue-500 ring-2 ring-blue-200' : 'border-slate-200'} ${!isLocked && 'hover:bg-slate-50'} transition-all fade-in" style="animation-delay: ${index * 50}ms;">
+                        <label for="check-${ev.id}" class="flex items-center gap-4 ${isLocked ? 'cursor-not-allowed' : 'cursor-pointer'}">
+                            <input type="checkbox" id="check-${ev.id}" onchange="toggleTestSelection('${ev.id}')" ${isSelected ? 'checked' : ''} ${isLocked ? 'disabled' : ''} class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                            <div class="text-3xl">${ev.icon}</div>
+                            <div class="flex-grow">
+                                <h3 class="font-bold text-slate-800">${ev.label}</h3>
+                                <p class="text-xs text-slate-500">${isLocked ? `Requires ${pct(ev.requiredPosterior,0)} confidence` : ev.hint}</p>
+                            </div>
+                            <div class="text-center space-y-1">
+                                <div class="font-bold text-blue-600">-${ev.cost}</div>
+                                <div class="text-xs text-slate-500">Budget</div>
+                                <div class="text-xs bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded-full flex items-center">
+                                    ${valuePerCost.toFixed(2)}
+                                    <div class="tooltip-container ml-1">
+                                        <span class="tooltip-trigger font-bold text-indigo-500">(?)</span>
+                                        <span class="tooltip-text">An estimate of how much information you get for each budget point spent.</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </label>
+                        <details class="mt-2">
+                            <summary class="text-xs text-slate-500 cursor-pointer hover:text-slate-800">Show possible outcomes...</summary>
+                            ${outcomesHTML}
+                        </details>
+                    </div>
+                </div>`;
+            }).join('');
+
+            const totalCost = selectedTests.reduce((sum, testId) => sum + scenario.evidence.find(e => e.id === testId).cost, 0);
+            const canAfford = totalCost <= (budget - spent);
+
+            const stickyFooter = document.getElementById('sticky-footer');
+            if (selectedTests.length > 0) {
+                stickyFooter.innerHTML = `<div class="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-sm border-t p-3 flex justify-between items-center shadow-lg">
+                    <span>Selected: <b>${selectedTests.length}</b> | Cost: <b class="${canAfford ? 'text-slate-800' : 'text-red-600'}">${totalCost}</b></span>
+                    <button id="run-tests-button-mobile" onclick="runSelectedTests()" class="py-2 px-4 rounded-lg bg-green-600 hover:bg-green-700 font-semibold text-white disabled:bg-slate-400" ${!canAfford ? 'disabled' : ''}>Run</button>
+                </div>`;
+                stickyFooter.classList.remove('hidden');
+            } else {
+                stickyFooter.classList.add('hidden');
+            }
+
+            return `<div class="w-full">
+                <h2 class="text-lg font-bold mb-4 text-slate-800 fade-in">Turn ${gameState.turn + 1}: Select Tests to Run</h2>
+                <div class="space-y-3">${testsHTML}</div>
+                <div class="mt-6 text-center hidden md:block">
+                    <p class="font-bold text-lg">Total Cost: <span class="${canAfford ? 'text-slate-800' : 'text-red-600'}">${totalCost}</span></p>
+                    <button id="run-tests-button-desktop" onclick="runSelectedTests()" class="w-full max-w-xs mx-auto mt-2 py-3 rounded-lg bg-green-600 hover:bg-green-700 font-semibold text-white text-lg disabled:bg-slate-400 disabled:cursor-not-allowed" ${selectedTests.length === 0 || !canAfford ? 'disabled' : ''}>
+                        Run Selected Tests
+                    </button>
+                </div>
+            </div>`;
+        }
+
+        function toggleTestSelection(testId) {
+            const index = selectedTests.indexOf(testId);
+            if (index > -1) selectedTests.splice(index, 1);
+            else selectedTests.push(testId);
+            renderApp();
+        }
+
+        function renderTurnResult(result) {
+            const { pre, post, actions, netLr } = result;
+            const [h, nh] = [gameState.targetHyp, gameState.scenario.hypotheses.find(hyp => hyp.id !== gameState.targetHyp).id];
+            const netLrInterp = getLrInterpretation(netLr);
+
+            const actionsHTML = actions.map(action => {
+                const interpretation = getLrInterpretation(action.lrEff);
+                const lrCalcHTML = action.failed ? '' : `(LR = P(E|${h}) / P(E|${nh}) = ${pct(action.out.p_given[h], 0)} / ${pct(action.out.p_given[nh], 0)} = ${action.lr.toFixed(2)}x)`;
+                const penaltyHTML = action.hadCorrelationPenalty
+                    ? `<p class="text-xs text-amber-800 ml-4 mt-1 bg-amber-100 p-2 rounded-md border border-amber-200">Note: The impact of this repeated test was reduced because evidence is less powerful when it's not independent.</p>`
+                    : '';
+                return `<div class="p-3 bg-slate-50 rounded-md text-left">
+                    <p class="font-semibold">${action.ev.label}${action.failed ? ' <span class="text-red-600 font-bold">(Failed)</span>' : ''}</p>
+                    <p class="text-sm text-slate-600 ml-4">➜ Outcome: "${action.out.label}"</p>
+                    <p class="text-sm text-slate-800 ml-4">➜ Impact: <span class="font-bold ${interpretation.color}">${interpretation.text}</span> (${pct(action.pre[h])} → ${pct(action.post[h])})</p>
+                    <p class="text-xs text-slate-500 ml-4">${lrCalcHTML}</p>
+                    ${penaltyHTML}
+                </div>`;
+            }).join('');
+            
+            const encouragingMessage = netLr < 1 ? `<p class="text-center text-sm text-slate-600 mt-4 p-2 bg-amber-100 rounded-md">Remember: evidence against a hypothesis is still useful progress toward finding the truth!</p>` : '';
+
+            setTimeout(() => {
+                const el = document.getElementById('turn-lr-display');
+                if (el) el.innerHTML = `This turn multiplied your odds <b class="${netLrInterp.color}">×${netLr.toFixed(2)}</b>`;
+            }, 10);
+
+            return `<div class="bg-white/80 backdrop-blur-md rounded-xl shadow-lg p-6 border border-slate-200 fade-in w-full">
+                <h2 class="text-2xl font-bold text-slate-800 my-2 text-center">Turn ${gameState.turn} Results</h2>
+                <div class="space-y-2 my-6">${actionsHTML}</div>
+                ${encouragingMessage}
+                <div class="flex gap-4 mt-6">
+                    <button onclick="renderExplanationModal()" class="w-full py-2 rounded-lg bg-amber-400 hover:bg-amber-500 font-semibold text-amber-900 transition-colors">💡 How the Math Works</button>
+                    <button onclick="turnResult = null; renderApp();" class="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-700 font-semibold text-white transition-colors">Continue</button>
+                </div>
+            </div>`;
+        }
+        
+        function getGameOutcomeNarrative(finalState) {
+            const { post, targetHyp, budget, spent, turn, scenario, priors, truth } = finalState;
+            const finalConfidence = post[targetHyp];
+            const success = finalConfidence >= scenario.constraints.target_posterior;
+            const hLabel = scenario.hypotheses.find(h => h.id === targetHyp).label;
+            const groundTruthText = truth === targetHyp ? `'${hLabel}' was indeed true` : `'${hLabel}' was actually false`;
+
+            let narrative = '';
+            if (success) {
+                narrative = `You started with a belief of <strong>${pct(priors[targetHyp])}</strong> in the hypothesis '${hLabel}' and correctly concluded with <strong>${pct(finalConfidence)}</strong> confidence. You efficiently used your resources to gather evidence that strongly supported the hypothesis, confirming that ${groundTruthText}. A textbook investigation!`;
+            } else {
+                if (spent >= budget) {
+                    narrative = `Your investigation ended because you ran out of budget. You started at <strong>${pct(priors[targetHyp])}</strong> in the hypothesis '${hLabel}' and ended at <strong>${pct(finalConfidence)}</strong>. While you were making progress, you couldn't gather enough decisive evidence before your resources were depleted. In reality, ${groundTruthText}.`;
+                } else if (turn >= scenario.constraints.max_turns) {
+                    narrative = `Your investigation ended because you ran out of time. Despite your efforts, you only reached <strong>${pct(finalConfidence)}</strong> confidence in the hypothesis '${hLabel}'. Time management is crucial when the clock is ticking! In reality, ${groundTruthText}.`;
+                } else {
+                    narrative = `The evidence you gathered consistently pointed away from the hypothesis, driving your confidence down to <strong>${pct(finalConfidence)}</strong>. You correctly concluded that the initial hypothesis '${hLabel}' was unlikely. In this case, ${groundTruthText}.`;
+                }
+            }
+            return narrative;
+        }
+
+        function reviewFinalMath() {
+            if (gameState && gameState.history.length > 0) {
+                turnResult = gameState.history[gameState.history.length - 1];
+                renderExplanationModal();
+            }
+        }
+
+        function renderGameOver(finalState) {
+            const { post, targetHyp, budget, spent, turn, scenario, priors, truth } = finalState;
+            const finalConfidence = post[targetHyp];
+            const success = finalConfidence >= scenario.constraints.target_posterior;
+            const confidenceBonus = Math.round(finalConfidence * 100 * 10);
+            const budgetBonus = (budget - spent) * 50;
+            const turnPenalty = turn * 20;
+            const score = confidenceBonus + budgetBonus - turnPenalty;
+            const narrativeHTML = getGameOutcomeNarrative(finalState);
+
+            return `<div class="bg-white/80 backdrop-blur-md rounded-xl shadow-lg p-6 border border-slate-200 text-center fade-in w-full max-w-2xl mx-auto">
+                <h2 class="text-2xl font-bold text-slate-800">${success ? 'Objective Complete! ✅' : 'Mission Over 🛑'}</h2>
+                <p class="text-slate-600 my-2">You ended with <b>${pct(finalConfidence)}</b> confidence.</p>
+                
+                <div class="my-6 bg-slate-100 p-4 rounded-lg text-left">
+                    <h3 class="font-bold text-center text-slate-800 mb-2">Final Score Breakdown</h3>
+                    <div class="flex justify-between items-center text-sm border-b py-1.5"><span class="text-slate-600">Confidence Bonus (${pct(finalConfidence)})</span><span class="font-bold text-green-600">+${confidenceBonus.toLocaleString()}</span></div>
+                    <div class="flex justify-between items-center text-sm border-b py-1.5"><span class="text-slate-600">Budget Remaining Bonus (${budget - spent} × 50)</span><span class="font-bold text-green-600">+${budgetBonus.toLocaleString()}</span></div>
+                    <div class="flex justify-between items-center text-sm py-1.5"><span class="text-slate-600">Turns Used Penalty (${turn} × 20)</span><span class="font-bold text-red-600">-${turnPenalty.toLocaleString()}</span></div>
+                    <hr class="my-2 border-slate-300">
+                    <div class="flex justify-between items-center text-xl mt-2"><span class="font-bold">Total Score</span><span class="font-extrabold text-indigo-600">${score.toLocaleString()}</span></div>
+                </div>
+
+                <div class="my-6 text-left bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <h3 class="font-bold text-slate-800 mb-2">The Story of Your Investigation</h3>
+                    <p class="text-sm text-slate-700">${narrativeHTML}</p>
+                </div>
+                <div class="flex justify-center gap-2 my-4">
+                    <div class="bg-white rounded-full px-3 py-1 text-sm shadow-sm border"><span class="font-medium">Budget Left:</span> <b>${budget - spent}</b></div>
+                    <div class="bg-white rounded-full px-3 py-1 text-sm shadow-sm border"><span class="font-medium">Turns Used:</span> <b>${turn}/${scenario.constraints.max_turns}</b></div>
+                </div>
+                <div class="mt-6 flex justify-center gap-4">
+                    ${finalState.history.length > 0 ? `<button onclick="reviewFinalMath()" class="py-2 px-6 rounded-lg bg-amber-400 hover:bg-amber-500 font-semibold text-amber-900 transition-colors">💡 How the Math Works</button>` : ''}
+                    <button onclick="appState = 'setup'; renderApp();" class="py-2 px-6 rounded-lg bg-blue-600 hover:bg-blue-700 font-semibold text-white">Back to Setup</button>
+                </div>
+            </div>`;
+        }
+
+        // --- MODAL & EDITOR FUNCTIONS ---
+        function getBayesianIntuition(outcome, lr) {
+            if (outcome.id === 'other_tracks' && lr < 1) {
+                return `
+                    <div class="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm">
+                        <p class="font-bold text-amber-800">Bayesian Intuition 🤔</p>
+                        <p class="text-slate-700 mt-1">Wait, why is finding other birds' tracks evidence <strong>against</strong> the Jay being present? It doesn't prove the Jay <em>isn't</em> there.</p>
+                        <p class="text-slate-700 mt-2">That's true, but we are comparing probabilities. The key is that you are <strong>more likely</strong> to find common bird tracks if the Jay is absent (an 85% chance) than if it is present (a 60% chance). Because the outcome is more probable in a world where the Jay is absent, it nudges our belief in that direction.</p>
+                    </div>
+                `;
+            }
+            return '';
+        }
+
+        function renderExplanationModal() {
+            const { actions, pre, post, netLr } = turnResult;
+            const [h, nh] = [gameState.targetHyp, gameState.scenario.hypotheses.find(hyp => hyp.id !== gameState.targetHyp).id];
+            const hLabel = gameState.scenario.hypotheses.find(hyp => hyp.id === h).label;
+            const nhLabel = gameState.scenario.hypotheses.find(hyp => hyp.id === nh).label;
+            
+            const summaryHTML = `<div class="p-4 border rounded-lg bg-slate-50 font-mono text-center">
+                ${odds(pre[h]).toFixed(2)} (prior odds) &times; ${netLr.toFixed(2)} (net LR) = ${odds(post[h]).toFixed(2)} (posterior odds)
+            </div>`;
+
+            const updateStepsHTML = (form) => actions.map((action, index) => {
+                const { pre: stepPre, post: stepPost, out, lrEff, ev } = action;
+                if (action.failed) return '';
+                if (form === 'odds') {
+                    const p_h_pct = out.p_given[h] * 100;
+                    const p_nh_pct = out.p_given[nh] * 100;
+                    const intuitionHTML = getBayesianIntuition(out, lrEff);
+                    return `<details class="p-4 border rounded-lg mt-4 bg-white" ${actions.length === 1 ? 'open' : ''}>
+                        <summary class="font-bold text-lg cursor-pointer">Update #${index + 1}: ${ev.label}</summary>
+                        <div class="mt-2 space-y-4">
+                            <p class="text-sm text-slate-600">Observed Outcome (The Evidence): <b class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded">${out.label}</b></p>
+                            <div class="p-3 border rounded-lg">
+                                <p class="font-semibold">Step 1: Find the Power of the Evidence (Likelihood Ratio)</p>
+                                <p class="text-sm text-slate-600 mt-2">For the outcome you just saw, the scenario defines these "rules of the world":</p>
+                                <div class="flex flex-col sm:flex-row items-center gap-2 mt-2">
+                                    <div class="flex-1 w-full text-center p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                                        <p class="font-semibold text-blue-800">If '${hLabel}' is TRUE...</p>
+                                        <p class="text-xs">...there is a <b>${pct(out.p_given[h])}</b> chance of seeing the outcome: <span class="font-bold">'${out.label}'</span>.</p>
+                                        <div class="w-full bg-blue-200 rounded h-4 mt-1"><div class="bg-blue-500 h-4 rounded" style="width: ${p_h_pct}%"></div></div>
+                                    </div>
+                                    <div class="flex-1 w-full text-center p-2 bg-red-50 border border-red-200 rounded-lg">
+                                        <p class="font-semibold text-red-800">If '${nhLabel}' is TRUE...</p>
+                                        <p class="text-xs">...there is a <b>${pct(out.p_given[nh])}</b> chance of seeing the outcome: <span class="font-bold">'${out.label}'</span>.</p>
+                                        <div class="w-full bg-red-200 rounded h-4 mt-1"><div class="bg-red-500 h-4 rounded" style="width: ${p_nh_pct}%"></div></div>
+                                    </div>
+                                </div>
+                                <p class="text-sm text-slate-600 mt-2">The <b>Likelihood Ratio (LR)</b> is calculated by dividing the first chance by the second. It answers: <i>"How many times more likely was I to see this evidence if the hypothesis is true?"</i></p>
+                                <p class="text-lg font-mono text-center bg-slate-50 p-2 rounded-md mt-2">LR = ${pct(out.p_given[h])} / ${pct(out.p_given[nh])} = <b>${lrEff.toFixed(3)}x</b></p>
+                                ${intuitionHTML}
+                            </div>
+                            <div class="p-3 border rounded-lg">
+                                <p class="font-semibold">Step 2: Update Your Belief in Odds</p>
+                                <p class="text-sm text-slate-600 mt-2">The Likelihood Ratio is the exact number we need to multiply our old odds by to get our new odds.</p>
+                                <p class="text-lg font-mono text-center bg-slate-50 p-2 rounded-md mt-2">New Odds = Old Odds &times; Likelihood Ratio</p>
+                                <p class="text-lg font-mono text-center bg-slate-50 p-2 rounded-md mt-1">
+                                    <span title="Prior Odds">${odds(stepPre[h]).toFixed(3)}</span> &times; <span title="Likelihood Ratio">${lrEff.toFixed(3)}</span> = <b title="Posterior Odds">${odds(stepPost[h]).toFixed(3)}</b>
+                                </p>
+                            </div>
+                            <div class="p-3 border rounded-lg">
+                                <p class="font-semibold">Step 3: Convert Back to a Percentage</p>
+                                <p class="text-sm text-slate-600 mt-2">Finally, we convert our new odds back into a familiar percentage.</p>
+                                <p class="text-lg font-mono text-center bg-slate-50 p-2 rounded-md mt-2">Probability = Odds / (1 + Odds)</p>
+                                <p class="text-lg font-mono text-center bg-slate-50 p-2 rounded-md mt-1">${odds(stepPost[h]).toFixed(3)} &rarr; <b class="text-blue-800">${pct(stepPost[h])}</b></p>
+                            </div>
+                        </div>
+                    </details>`;
+                } else { // Probability Form
+                    const prior_h = stepPre[h];
+                    const prior_nh = 1 - prior_h;
+                    const p_e_given_h = out.p_given[h];
+                    const p_e_given_nh = out.p_given[nh];
+                    const p_e = (p_e_given_h * prior_h) + (p_e_given_nh * prior_nh);
+                    const posterior_h = (p_e_given_h * prior_h) / p_e;
+                    
+                    return `<details class="p-4 border rounded-lg mt-4 bg-white" ${actions.length === 1 ? 'open' : ''}>
+                        <summary class="font-bold text-lg cursor-pointer">Update #${index + 1}: ${ev.label}</summary>
+                        <div class="mt-2 space-y-4">
+                            <p class="text-sm text-slate-600">Observed Outcome (E): <b class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded">${out.label}</b></p>
+                            <div class="p-3 border rounded-lg">
+                                <p class="font-semibold">Full Bayes' Theorem</p>
+                                <p class="text-lg font-mono text-center bg-slate-50 p-2 rounded-md mt-2">P(H|E) = [P(E|H) * P(H)] / P(E)</p>
+                                <div class="text-sm text-slate-600 mt-2 space-y-1">
+                                    <p><b>P(H)</b>: Your prior belief = ${prior_h.toFixed(3)}</p>
+                                    <p><b>P(E|H)</b>: Likelihood of evidence if H is true = ${p_e_given_h.toFixed(3)}</p>
+                                    <p><b>P(E)</b>: Overall probability of the evidence. Calculated as P(E|H)P(H) + P(E|~H)P(~H)</p>
+                                    <p class="pl-4">= (${p_e_given_h.toFixed(3)} * ${prior_h.toFixed(3)}) + (${p_e_given_nh.toFixed(3)} * ${prior_nh.toFixed(3)}) = <b>${p_e.toFixed(3)}</b></p>
+                                </div>
+                                <hr class="my-2">
+                                <p class="text-lg font-mono text-center bg-slate-50 p-2 rounded-md mt-2">
+                                    P(H|E) = [${p_e_given_h.toFixed(3)} * ${prior_h.toFixed(3)}] / ${p_e.toFixed(3)}
+                                    = ${ (p_e_given_h * prior_h).toFixed(3) } / ${p_e.toFixed(3)} = <b>${posterior_h.toFixed(3)} (${pct(posterior_h)})</b>
+                                </p>
+                            </div>
+                        </div>
+                    </details>`;
+                }
+            }).join('');
+
+            const modalHTML = `<div id="explanation-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-30 modal-backdrop" onclick="closeModal('explanation-modal')">
+                <div class="bg-slate-100 rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto modal-content" onclick="event.stopPropagation()">
+                <header class="p-4 border-b flex justify-between items-center sticky top-0 bg-white/80 z-10 backdrop-blur-sm"><h2 class="text-xl font-bold">How the Math Works</h2><button onclick="closeModal('explanation-modal')" class="p-1 rounded-full hover:bg-slate-200" aria-label="Close">X</button></header>
+                <div class="p-6">
+                    <div id="calc-tabs" class="flex border-b mb-4">
+                        <button class="flex-1 py-2 font-semibold text-slate-500 border-b-2 border-transparent ui-selected:text-blue-600 ui-selected:border-blue-600" data-form="odds">Odds Form (More Intuitive)</button>
+                        <button class="flex-1 py-2 font-semibold text-slate-500 border-b-2 border-transparent ui-selected:text-blue-600 ui-selected:border-blue-600" data-form="prob">Probability Form (Classic)</button>
+                    </div>
+                    <div id="calc-content-odds" class="space-y-4">
+                        <div class="text-center">
+                            <p class="text-lg font-semibold">The Core Idea:</p>
+                            <p class="text-2xl font-mono p-2 bg-white rounded-md shadow-sm inline-block">New Belief = Old Belief &times; Power of Evidence</p>
+                        </div>
+                        ${actions.length > 1 ? `<div><h3 class="font-bold text-lg mb-2">Overall Turn Summary</h3>${summaryHTML}</div>` : ''}
+                        ${updateStepsHTML('odds')}
+                    </div>
+                    <div id="calc-content-prob" class="hidden space-y-4">
+                        ${updateStepsHTML('prob')}
+                    </div>
+                </div></div></div>`;
+            document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+            const tabs = document.querySelectorAll('#calc-tabs button');
+            const oddsContent = document.getElementById('calc-content-odds');
+            const probContent = document.getElementById('calc-content-prob');
+            
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    tabs.forEach(t => t.classList.remove('ui-selected'));
+                    tab.classList.add('ui-selected');
+                    
+                    if (tab.dataset.form === 'odds') {
+                        oddsContent.classList.remove('hidden');
+                        probContent.classList.add('hidden');
+                    } else {
+                        oddsContent.classList.add('hidden');
+                        probContent.classList.remove('hidden');
+                    }
+                });
+            });
+            tabs[0].classList.add('ui-selected'); // Select first tab by default
+        }
+
+        function closeModal(id) { 
+            const modal = document.getElementById(id); 
+            if (modal) modal.remove();
+        }
+
+        function renderEditorScreen() {
+            const scenario = customScenario;
+            const evidenceHTML = scenario.evidence.map((ev, evIndex) => {
+                const outcomesHTML = ev.outcomes.map((out, outIndex) => `
+                    <div class="p-3 bg-slate-100 rounded-md mt-2 relative">
+                        <button type="button" onclick="removeOutcome(${evIndex}, ${outIndex})" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full h-5 w-5 text-xs font-bold leading-none">&times;</button>
+                        <label class="block text-xs font-medium text-slate-600">Outcome ${outIndex + 1} Label</label>
+                        <input type="text" value="${out.label}" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm" data-ev="${evIndex}" data-out="${outIndex}" data-prop="label">
+                        <div class="grid grid-cols-2 gap-4 mt-2">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600">P(E|H)</label>
+                                <input type="number" step="0.01" min="0" max="1" value="${out.p_given.H}" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm" data-ev="${evIndex}" data-out="${outIndex}" data-prop="p_given.H">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600">P(E|~H)</label>
+                                <input type="number" step="0.01" min="0" max="1" value="${out.p_given['~H']}" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm" data-ev="${evIndex}" data-out="${outIndex}" data-prop="p_given.~H">
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+
+                return `<div class="p-4 border rounded-lg bg-white mt-4 relative">
+                    <button type="button" onclick="removeEvidence(${evIndex})" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full h-5 w-5 text-xs font-bold leading-none">&times;</button>
+                    <h4 class="font-bold">Evidence #${evIndex + 1}</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+                        <div><label class="block text-xs font-medium text-slate-600">Label</label><input type="text" value="${ev.label}" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm" data-ev="${evIndex}" data-prop="label"></div>
+                        <div><label class="block text-xs font-medium text-slate-600">Cost</label><input type="number" value="${ev.cost}" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm" data-ev="${evIndex}" data-prop="cost"></div>
+                        <div><label class="block text-xs font-medium text-slate-600">Icon</label><input type="text" value="${ev.icon}" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm" data-ev="${evIndex}" data-prop="icon"></div>
+                    </div>
+                    <div><label class="block text-xs font-medium text-slate-600 mt-2">Hint</label><input type="text" value="${ev.hint}" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm" data-ev="${evIndex}" data-prop="hint"></div>
+                    <h5 class="font-semibold text-sm mt-4">Outcomes</h5>
+                    ${outcomesHTML}
+                    <button type="button" onclick="addOutcome(${evIndex})" class="mt-2 text-xs bg-green-100 hover:bg-green-200 text-green-800 font-semibold py-1 px-2 rounded-md">Add Outcome</button>
+                </div>`;
+            }).join('');
+
+            document.getElementById('app').innerHTML = `<header class="text-center mb-8"><h1 class="text-4xl font-extrabold text-slate-900">Scenario Editor</h1></header>
+            <form id="scenario-editor-form" class="max-w-4xl mx-auto bg-white/80 backdrop-blur-md p-8 rounded-2xl shadow-lg border border-slate-200" onsubmit="event.preventDefault(); saveCustomScenario();">
+                <div class="space-y-6">
+                    <div>
+                        <h3 class="text-lg font-bold">General Info</h3>
+                        <label class="block text-sm font-medium text-slate-700">Title</label>
+                        <input type="text" id="editor-title" value="${scenario.title}" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm">
+                        <label class="block text-sm font-medium text-slate-700 mt-2">Briefing</label>
+                        <textarea id="editor-briefing" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm">${scenario.briefing}</textarea>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold">Constraints</h3>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div><label class="block text-sm font-medium">Budget</label><input type="number" id="editor-budget" value="${scenario.constraints.budget}" class="mt-1 w-full rounded-md"></div>
+                            <div><label class="block text-sm font-medium">Max Turns</label><input type="number" id="editor-max_turns" value="${scenario.constraints.max_turns}" class="mt-1 w-full rounded-md"></div>
+                            <div><label class="block text-sm font-medium">Target %</label><input type="number" id="editor-target_posterior" step="0.01" min="0" max="1" value="${scenario.constraints.target_posterior}" class="mt-1 w-full rounded-md"></div>
+                            <div><label class="block text-sm font-medium">Initial Prior %</label><input type="number" id="editor-initial_prior" step="0.01" min="0" max="1" value="${scenario.constraints.initial_prior}" class="mt-1 w-full rounded-md"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold">Evidence Types</h3>
+                        <div id="evidence-editor-container">${evidenceHTML}</div>
+                        <button type="button" onclick="addEvidence()" class="mt-4 w-full bg-blue-100 hover:bg-blue-200 text-blue-800 font-semibold py-2 px-4 rounded-lg">Add New Test</button>
+                    </div>
+                </div>
+                <div class="mt-8 pt-6 border-t flex justify-between items-center">
+                    <button type="button" onclick="appState='setup'; renderApp();" class="py-2 px-6 rounded-lg bg-slate-200 hover:bg-slate-300 font-semibold text-slate-700">Back to Setup</button>
+                    <div>
+                        <button type="submit" class="py-2 px-6 rounded-lg bg-green-600 hover:bg-green-700 font-semibold text-white">Save Changes</button>
+                        <button type="button" onclick="startGame()" class="ml-2 py-2 px-6 rounded-lg bg-blue-600 hover:bg-blue-700 font-semibold text-white">Play Custom Scenario</button>
+                    </div>
+                </div>
+            </form>`;
+        }
+
+        function addEvidence() {
+            customScenario.evidence.push({
+                id: `custom_${Date.now()}`,
+                label: "New Test",
+                cost: 1,
+                hint: "A new custom test.",
+                icon: '❓',
+                requiredPosterior: 0,
+                chanceOfFailure: 0,
+                correlation: 0.5,
+                outcomes: [
+                    { id: "new_outcome_1", label: "Outcome A", p_given: { H: 0.5, "~H": 0.5 } },
+                    { id: "new_outcome_2", label: "Outcome B", p_given: { H: 0.5, "~H": 0.5 } }
+                ]
+            });
+            renderEditorScreen();
+        }
+
+        function removeEvidence(index) {
+            customScenario.evidence.splice(index, 1);
+            renderEditorScreen();
+        }
+
+        function addOutcome(evIndex) {
+            customScenario.evidence[evIndex].outcomes.push({
+                id: `new_outcome_${Date.now()}`,
+                label: "New Outcome",
+                p_given: { H: 0.5, "~H": 0.5 }
+            });
+            renderEditorScreen();
+        }
+
+        function removeOutcome(evIndex, outIndex) {
+            customScenario.evidence[evIndex].outcomes.splice(outIndex, 1);
+            renderEditorScreen();
+        }
+
+        function saveCustomScenario() {
+            customScenario.title = document.getElementById('editor-title').value;
+            customScenario.briefing = document.getElementById('editor-briefing').value;
+            customScenario.constraints.budget = parseInt(document.getElementById('editor-budget').value);
+            customScenario.constraints.max_turns = parseInt(document.getElementById('editor-max_turns').value);
+            customScenario.constraints.target_posterior = parseFloat(document.getElementById('editor-target_posterior').value);
+            customScenario.constraints.initial_prior = parseFloat(document.getElementById('editor-initial_prior').value);
+
+            const evidenceInputs = document.querySelectorAll('#evidence-editor-container input');
+            evidenceInputs.forEach(input => {
+                const evIndex = input.dataset.ev;
+                const prop = input.dataset.prop;
+                if (input.dataset.out !== undefined) { // Outcome property
+                    const outIndex = input.dataset.out;
+                    if (prop.startsWith('p_given')) {
+                        const hyp = prop.split('.')[1];
+                        customScenario.evidence[evIndex].outcomes[outIndex].p_given[hyp] = parseFloat(input.value);
+                    } else {
+                        customScenario.evidence[evIndex].outcomes[outIndex][prop] = input.value;
+                    }
+                } else { // Evidence property
+                    customScenario.evidence[evIndex][prop] = (input.type === 'number') ? parseInt(input.value) : input.value;
+                }
+            });
+
+            localStorage.setItem('bayesScenario', JSON.stringify(customScenario));
+            alert('Scenario saved!');
+        }
+        
+        // --- SANDBOX MODE FUNCTIONS ---
+        function renderSandboxScreen() {
+            document.getElementById('app').innerHTML = `<header class="text-center mb-8">
+                    <h1 class="text-4xl font-extrabold text-slate-900">Sandbox Mode 🧪</h1>
+                    <p class="text-slate-600 max-w-2xl mx-auto mt-2">Directly manipulate the components of Bayes' theorem to see how they interact.</p>
+                </header>
+                <div class="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+                    <div class="bg-white/80 backdrop-blur-md p-8 rounded-2xl shadow-lg border border-slate-200 space-y-6">
+                        <div id="sandbox-prior-container" class="p-2 rounded-lg transition-all">
+                            <label for="sandbox-prior" class="text-lg font-bold">Prior: P(H)</label>
+                            <p class="text-sm text-slate-500 mb-2">Your <b>starting belief</b> in the hypothesis (H) before seeing any evidence.</p>
+                            <div class="text-2xl font-bold text-blue-600 text-center mb-1" id="sandbox-prior-val">50.0%</div>
+                            <input type="range" id="sandbox-prior" min="0.01" max="0.99" step="0.01" value="0.5" class="w-full" oninput="updateSandboxSliders()">
+                        </div>
+                        <div id="sandbox-p_e_h-container" class="p-2 rounded-lg transition-all">
+                            <label for="sandbox-p_e_h" class="text-lg font-bold">Likelihood: P(E|H)</label>
+                            <p class="text-sm text-slate-500 mb-2">The "true positive rate". The chance of seeing the evidence (E) <b>if the hypothesis is true.</b></p>
+                            <div class="text-2xl font-bold text-blue-600 text-center mb-1" id="sandbox-p_e_h-val">75.0%</div>
+                            <input type="range" id="sandbox-p_e_h" min="0.00" max="1.00" step="0.01" value="0.75" class="w-full" oninput="updateSandboxSliders()">
+                        </div>
+                        <div id="sandbox-p_e_nh-container" class="p-2 rounded-lg transition-all">
+                            <label for="sandbox-p_e_nh" class="text-lg font-bold">Likelihood: P(E|~H)</label>
+                            <p class="text-sm text-slate-500 mb-2">The "false positive rate". The chance of seeing the evidence (E) <b>if the hypothesis is false.</b></p>
+                            <div class="text-2xl font-bold text-blue-600 text-center mb-1" id="sandbox-p_e_nh-val">25.0%</div>
+                            <input type="range" id="sandbox-p_e_nh" min="0.00" max="1.00" step="0.01" value="0.25" class="w-full" oninput="updateSandboxSliders()">
+                        </div>
+                    </div>
+                    <div class="bg-slate-200/50 p-6 rounded-2xl shadow-lg border border-slate-200 flex flex-col justify-center">
+                        <div id="sandbox-result" class="text-center">
+                            <!-- Calculation result will be injected here -->
+                        </div>
+                        <button onclick="appState='setup'; renderApp();" class="mt-8 py-2 px-6 rounded-lg bg-slate-200 hover:bg-slate-300 font-semibold text-slate-700 transition-colors self-center">Back to Scenarios</button>
+                        <button onclick="setBaseRateFallacy()" class="mt-8 py-2 px-6 rounded-lg bg-rose-500 hover:bg-rose-600 font-semibold text-white transition-colors self-center">Preset: Base Rate Fallacy</button>
+                    </div>
+                </div>`;
+            updateSandboxSliders();
+        }
+
+        function setBaseRateFallacy() {
+            document.getElementById('sandbox-prior').value = 0.01;
+            document.getElementById('sandbox-p_e_h').value = 0.99;
+            document.getElementById('sandbox-p_e_nh').value = 0.01;
+            updateSandboxSliders();
+        }
+
+        function renderSandboxExplanationModal(step) {
+            let title = '';
+            let content = '';
+
+            switch(step) {
+                case 'lr':
+                    title = 'Likelihood Ratio (LR)';
+                    content = `
+                        <p class="mb-2">The Likelihood Ratio is the <strong>engine of Bayesian updating</strong>. It measures the pure strength of a piece of evidence, completely separate from your starting beliefs.</p>
+                        <p class="mb-4">It answers the question: <strong>"How many times more likely is this evidence if my hypothesis is true, compared to if it's false?"</strong></p>
+                        <div class="font-mono text-center bg-slate-100 p-4 rounded-lg">LR = P(E|H) / P(E|~H)</div>
+                        <ul class="list-disc list-inside mt-4 space-y-2 text-sm">
+                            <li>A <strong>LR &gt; 1</strong> means the evidence supports the hypothesis (it's more likely to occur if H is true).</li>
+                            <li>A <strong>LR &lt; 1</strong> means the evidence goes against the hypothesis.</li>
+                            <li>A <strong>LR = 1</strong> means the evidence is completely uninformative.</li>
+                        </ul>
+                    `;
+                    break;
+                case 'odds':
+                    title = 'Updating with Odds';
+                    content = `
+                        <p class="mb-2">While we often think in percentages, Bayes' theorem is mathematically simpler using <strong>odds</strong>. Odds represent the ratio of the probability of something happening to the probability of it not happening.</p>
+                        <p class="mb-4">The magic of the Likelihood Ratio is that you can directly multiply it with your old odds to get your new odds. It's a simple, powerful update.</p>
+                        <div class="font-mono text-center bg-slate-100 p-4 rounded-lg">Posterior Odds = Prior Odds × Likelihood Ratio</div>
+                        <p class="text-sm mt-4">This is the core of "Bayes' Rule in odds form". It elegantly separates your prior belief (Prior Odds) from the strength of the new evidence (LR).</p>
+                    `;
+                    break;
+                case 'prob':
+                    title = 'Converting Odds to Probability';
+                    content = `
+                        <p class="mb-2">Since we are more comfortable with percentages, the final step is to convert our updated odds back into a probability.</p>
+                        <p class="mb-4">The formula is straightforward:</p>
+                        <div class="font-mono text-center bg-slate-100 p-4 rounded-lg">Probability = Odds / (1 + Odds)</div>
+                        <p class="text-sm mt-4">For example, if the odds are 4:1 (or just 4), the probability is 4 / (1 + 4) = 0.80 or 80%.</p>
+                    `;
+                    break;
+            }
+
+            const modalHTML = `
+                <div id="sandbox-explanation-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 modal-backdrop" onclick="closeModal('sandbox-explanation-modal')">
+                    <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg modal-content" onclick="event.stopPropagation()">
+                        <header class="p-4 border-b flex justify-between items-center">
+                            <h2 class="text-xl font-bold">${title}</h2>
+                            <button onclick="closeModal('sandbox-explanation-modal')" class="text-2xl font-bold leading-none p-1 rounded-full hover:bg-slate-200" aria-label="Close">&times;</button>
+                        </header>
+                        <div class="p-6 text-slate-700">${content}</div>
+                    </div>
+                </div>`;
+            
+            document.body.insertAdjacentHTML('beforeend', modalHTML);
+        }
+
+        function updateSandboxSliders() {
+            const prior = parseFloat(document.getElementById('sandbox-prior').value);
+            const p_e_h = parseFloat(document.getElementById('sandbox-p_e_h').value);
+            const p_e_nh = parseFloat(document.getElementById('sandbox-p_e_nh').value);
+
+            document.getElementById('sandbox-prior-val').textContent = pct(prior);
+            document.getElementById('sandbox-p_e_h-val').textContent = pct(p_e_h);
+            document.getElementById('sandbox-p_e_nh-val').textContent = pct(p_e_nh);
+
+            const lr = p_e_h / Math.max(p_e_nh, 1e-12);
+            const priorOdds = odds(prior);
+            const posteriorOdds = priorOdds * lr;
+            const posterior = fromOdds(posteriorOdds);
+
+            const resultHTML = `
+                <div class="space-y-3 text-left">
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <p class="text-sm font-semibold text-slate-700">1. Calculate Likelihood Ratio</p>
+                            <button onclick="renderSandboxExplanationModal('lr')" class="text-xs bg-white hover:bg-slate-100 px-2 py-0.5 rounded-md font-semibold border border-slate-300">Explain</button>
+                        </div>
+                        <p class="text-xs text-slate-500">How strong is the evidence?</p>
+                        <p class="font-mono text-sm text-center bg-white p-2 mt-1 rounded-md shadow-sm">
+                            LR = P(E|H) / P(E|~H) = ${p_e_h.toFixed(2)} / ${p_e_nh.toFixed(2)} = <b class="text-indigo-600">${lr.toFixed(2)}x</b>
+                        </p>
+                    </div>
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <p class="text-sm font-semibold text-slate-700">2. Update Belief in Odds</p>
+                            <button onclick="renderSandboxExplanationModal('odds')" class="text-xs bg-white hover:bg-slate-100 px-2 py-0.5 rounded-md font-semibold border border-slate-300">Explain</button>
+                        </div>
+                        <p class="text-xs text-slate-500">Combine prior belief with evidence.</p>
+                        <p class="font-mono text-sm text-center bg-white p-2 mt-1 rounded-md shadow-sm">
+                            New Odds = ${priorOdds.toFixed(2)} &times; ${lr.toFixed(2)} = <b class="text-indigo-600">${posteriorOdds.toFixed(2)}</b>
+                        </p>
+                    </div>
+                     <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <p class="text-sm font-semibold text-slate-700">3. Convert to Probability</p>
+                            <button onclick="renderSandboxExplanationModal('prob')" class="text-xs bg-white hover:bg-slate-100 px-2 py-0.5 rounded-md font-semibold border border-slate-300">Explain</button>
+                        </div>
+                        <p class="text-xs text-slate-500">Get the final percentage.</p>
+                        <p class="font-mono text-sm text-center bg-white p-2 mt-1 rounded-md shadow-sm">
+                            P(H|E) = New Odds / (1 + New Odds) = <b class="text-indigo-600">${pct(posterior)}</b>
+                        </p>
+                    </div>
+                    <hr class="my-4 border-slate-300">
+                    <div class="text-center">
+                        <p class="text-lg font-bold text-slate-800">New Posterior P(H|E)</p>
+                        <p class="text-5xl font-extrabold text-blue-600 value-pulse">${pct(posterior)}</p>
+                    </div>
+                </div>
+            `;
+            document.getElementById('sandbox-result').innerHTML = resultHTML;
+        }
+
+        // --- TUTORIAL FUNCTIONS ---
+        function startTutorial() {
+            const steps = [
+                {
+                    element: '#gauge-container',
+                    text: "This is your <b>Confidence Gauge</b>. It shows your current belief in the hypothesis. Your goal is to raise it past the target marker (🎯)!",
+                    position: 'bottom',
+                    showSkip: true
+                },
+                {
+                    element: '#status-container',
+                    text: "This is your <b>Budget</b>. Every test you run costs resources. Don't run out before you reach your goal!",
+                    position: 'bottom'
+                },
+                {
+                    element: '#test-card-tracks, #test-card-blood_test, #test-card-witness',
+                    text: "Let's run our first test. Tests provide evidence to update your belief. Click this low-cost test to select it.",
+                    position: 'right',
+                    waitForClick: true
+                },
+                {
+                    element: '#run-tests-button-desktop, #run-tests-button-mobile',
+                    text: "Great! Now click here to run the selected test and see the results.",
+                    position: 'top',
+                    waitForClick: true
+                }
+            ];
+            
+            let currentStep = 0;
+
+            function showNextStep() {
+                if (currentStep >= steps.length) {
+                    endTutorial();
+                    return;
+                }
+                const step = steps[currentStep];
+                const targetElements = document.querySelectorAll(step.element);
+
+                if (targetElements.length === 0) {
+                    currentStep++;
+                    showNextStep();
+                    return;
+                }
+                
+                const primaryTarget = Array.from(targetElements).find(el => el.offsetParent !== null) || targetElements[0];
+                
+                const container = document.getElementById('tutorial-container');
+                const rect = primaryTarget.getBoundingClientRect();
+                
+                let modalTop, modalLeft, transform;
+                switch(step.position) {
+                    case 'bottom':
+                        modalTop = `${rect.bottom + 15}px`;
+                        modalLeft = `${rect.left + rect.width / 2}px`;
+                        transform = 'translateX(-50%)';
+                        break;
+                    case 'top':
+                        modalTop = `${rect.top - 15}px`;
+                        modalLeft = `${rect.left + rect.width / 2}px`;
+                        transform = 'translate(-50%, -100%)';
+                        break;
+                    case 'right':
+                         modalTop = `${rect.top + rect.height / 2}px`;
+                         modalLeft = `${rect.right + 15}px`;
+                         transform = 'translateY(-50%)';
+                         break;
+                    default:
+                         modalTop = `${rect.bottom + 15}px`;
+                         modalLeft = `${rect.left + rect.width / 2}px`;
+                         transform = 'translateX(-50%)';
+                }
+
+                const skipButtonHTML = step.showSkip ? `<button onclick="endTutorial(true)" class="text-xs text-slate-500 hover:underline">Skip</button>` : '';
+                const nextButtonHTML = !step.waitForClick ? `<button onclick="window.advanceTutorial()" class="py-1 px-3 rounded-md bg-blue-600 text-white font-semibold">Next</button>` : '<div></div>';
+
+                container.innerHTML = `
+                    <div class="tutorial-overlay" onclick="${!step.waitForClick ? 'window.advanceTutorial()' : ''}"></div>
+                    <div class="tutorial-modal" style="top: ${modalTop}; left: ${modalLeft}; transform: ${transform};">
+                        <p class="text-sm">${step.text}</p>
+                        <div class="mt-4 flex justify-between items-center">
+                            ${nextButtonHTML}
+                            ${skipButtonHTML}
+                        </div>
+                    </div>
+                `;
+                
+                targetElements.forEach(el => el.classList.add('tutorial-highlight'));
+
+                if (step.waitForClick) {
+                    const advance = (e) => {
+                        targetElements.forEach(el => el.removeEventListener('click', advance, true));
+                        window.advanceTutorial();
+                    };
+                    targetElements.forEach(el => el.addEventListener('click', advance, true));
+                }
+            }
+
+            window.advanceTutorial = () => {
+                document.querySelectorAll('.tutorial-highlight').forEach(el => el.classList.remove('tutorial-highlight'));
+                document.getElementById('tutorial-container').innerHTML = '';
+                currentStep++;
+                setTimeout(showNextStep, 50);
+            };
+            
+            showNextStep();
+        }
+
+        function endTutorial(final = false) {
+            document.getElementById('tutorial-container').innerHTML = '';
+            document.querySelectorAll('.tutorial-highlight').forEach(el => el.classList.remove('tutorial-highlight'));
+            if(final) {
+                localStorage.setItem('bayesTutorialCompleted', 'true');
+            }
+        }
+
+        function showFinalTutorialStep() {
+            if (localStorage.getItem('bayesTutorialCompleted')) return;
+            const container = document.getElementById('tutorial-container');
+            const gauge = document.getElementById('gauge-container');
+            if (!gauge) return;
+            const rect = gauge.getBoundingClientRect();
+
+            container.innerHTML = `
+                <div class="tutorial-overlay" onclick="endTutorial(true)"></div>
+                <div class="tutorial-modal" style="top: ${rect.bottom + 15}px; left: ${rect.left + rect.width / 2}px; transform: translateX(-50%);">
+                    <p class="text-sm">See? The evidence updated your confidence! Keep running tests to build your case. Good luck!</p>
+                    <button onclick="endTutorial(true)" class="mt-4 py-1 px-3 rounded-md bg-blue-600 text-white font-semibold">Got it!</button>
+                </div>
+            `;
+            gauge.classList.add('tutorial-highlight');
+        }
+
+
+        // --- MAIN RENDER FUNCTION ---
+        function renderApp() {
+            const app = document.getElementById('app');
+            if (appState === 'setup') { renderSetupScreen(); return; }
+            if (appState === 'sandbox') { renderSandboxScreen(); return; }
+            if (appState === 'editor') { renderEditorScreen(); return; }
+            
+            const { scenario, post, targetHyp, budget, spent, turn, history } = gameState;
+            const { max_turns, target_posterior } = scenario.constraints;
+            const isGameOver = post[targetHyp] >= target_posterior || spent >= budget || turn >= max_turns;
+            let mainContentHTML = '';
+            if (isGameOver) mainContentHTML = renderGameOver(gameState);
+            else if (turnResult) {
+                mainContentHTML = renderTurnResult(turnResult);
+                if (gameState.turn === 1) showFinalTutorialStep();
+            }
+            else mainContentHTML = renderEvidenceChoices(scenario, spent, budget, post[targetHyp]);
+            
+            const unlockedTest = scenario.evidence.find(e => e.requiredPosterior > 0)?.requiredPosterior || 0;
+            app.innerHTML = `<header class="text-center mb-8"><h1 class="text-4xl font-extrabold text-slate-900">${scenario.title}</h1></header>
+                <div class="grid md:grid-cols-3 gap-8">
+                    <main class="md:col-span-2 bg-slate-200/50 p-6 rounded-2xl relative min-h-[400px] flex items-center justify-center">${mainContentHTML}</main>
+                    <aside class="space-y-6">
+                        ${renderGauge(post[targetHyp], target_posterior, unlockedTest)}
+                        ${renderStatusPills(budget, spent, turn, max_turns)}
+                        <div class="flex justify-center gap-2">
+                            <button onclick="appState = 'setup'; renderApp()" title="Restart Mission" class="py-2 px-3 bg-white rounded-full shadow-sm border hover:bg-slate-100 transition-colors">🔄</button>
+                            <button onclick="rewindTurn()" title="Rewind Turn" class="py-2 px-3 bg-white rounded-full shadow-sm border hover:bg-slate-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" ${history.length === 0 ? 'disabled' : ''}>⏪</button>
+                        </div>
+                    </aside>
+                </div>`;
+
+            // Apply juice animation to confidence display if appropriate
+            if (window.lastUpdateDirection) {
+                const confidenceEl = document.getElementById('confidence-pct');
+                if (confidenceEl) {
+                    if (window.lastUpdateDirection === 'increase') {
+                        confidenceEl.classList.add('value-increase');
+                    } else if (window.lastUpdateDirection === 'decrease') {
+                        confidenceEl.classList.add('value-decrease');
+                    }
+                    setTimeout(() => {
+                        confidenceEl.classList.remove('value-increase', 'value-decrease');
+                    }, 700);
+                }
+                window.lastUpdateDirection = null; // Reset after use
+            }
+        }
+
+        // --- INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            renderApp();
+        });
+    </script>
+</body>
+</html>
