@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Temple of Sigma: Probability Overdrive</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+        
+        :root {
+            --bg-dark: #050608;
+            --neon-blue: #00e0ff;
+            --neon-gold: #ffd666;
+            --neon-green: #4ade80;
+            --neon-red: #f87171;
+            --neon-purple: #a78bfa;
+        }
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background-color: var(--bg-dark);
+            color: #f9fafb;
+            overflow-x: hidden;
+        }
+
+        /* --- FORCE SCROLLBAR VISIBILITY (High Contrast) --- */
+        .force-scroll::-webkit-scrollbar {
+            width: 14px;
+        }
+
+        .force-scroll::-webkit-scrollbar-track {
+            background: #0f172a;
+            border-left: 1px solid #334155;
+        }
+
+        .force-scroll::-webkit-scrollbar-thumb {
+            background-color: #64748b; /* Visible Slate-500 */
+            border-radius: 6px;
+            border: 3px solid #0f172a;
+        }
+
+        .force-scroll::-webkit-scrollbar-thumb:hover {
+            background-color: #94a3b8; /* Lighter on hover */
+        }
+
+        /* Firefox */
+        .force-scroll {
+            scrollbar-width: auto;
+            scrollbar-color: #64748b #0f172a;
+        }
+
+        /* --- RPG ANIMATIONS --- */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+        .animate-shake { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+
+        @keyframes popIn {
+            0% { transform: scale(0.9) translateY(10px); opacity: 0; }
+            100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+        .animate-pop { animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+
+        @keyframes glitch {
+            0% { text-shadow: 2px 2px var(--neon-red), -2px -2px var(--neon-blue); }
+            25% { text-shadow: -2px 2px var(--neon-red), 2px -2px var(--neon-blue); }
+            50% { text-shadow: 2px -2px var(--neon-red), -2px 2px var(--neon-blue); }
+            100% { text-shadow: 0 0 transparent; }
+        }
+        .animate-glitch { animation: glitch 0.3s cubic-bezier(.25, .46, .45, .94) both; }
+
+        @keyframes float-up-fade {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-30px) scale(1.2); opacity: 0; }
+        }
+        .floating-text {
+            position: absolute; font-weight: bold; pointer-events: none; z-index: 100;
+            animation: float-up-fade 1s ease-out forwards;
+        }
+
+        /* Neon Borders & Glows */
+        .neon-border-blue { border: 1px solid var(--neon-blue); box-shadow: 0 0 5px var(--neon-blue), inset 0 0 2px var(--neon-blue); }
+        .neon-border-red { border: 1px solid var(--neon-red); box-shadow: 0 0 5px var(--neon-red), inset 0 0 2px var(--neon-red); }
+        .neon-border-gold { border: 1px solid var(--neon-gold); box-shadow: 0 0 5px var(--neon-gold), inset 0 0 2px var(--neon-gold); }
+        
+        .btn-neon {
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .btn-neon:active { transform: scale(0.95); }
+        .btn-neon:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(100%); }
+
+        /* Visualization Canvas */
+        #viz-canvas {
+            width: 100%;
+            height: 120px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 4px;
+        }
+        
+        /* Confetti */
+        .confetti-piece {
+            position: absolute; width: 8px; height: 8px; top: 0; pointer-events: none; z-index: 60;
+        }
+        @keyframes fall {
+            to { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+        }
+        
+        /* Formatted Logic Box */
+        .logic-step {
+            margin-bottom: 12px;
+            padding-left: 12px;
+            border-left: 3px solid #4ade80; /* neon green */
+            line-height: 1.5;
+        }
+        .logic-conclusion {
+            margin-top: 16px;
+            padding: 12px;
+            background: rgba(74, 222, 128, 0.05);
+            border-radius: 6px;
+            border: 1px solid #4ade80;
+            font-weight: bold;
+            color: #4ade80;
+            text-align: center;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center p-4 relative">
+
+    <!-- APP CONTAINER -->
+    <div id="app" class="max-w-5xl w-full z-10 relative flex flex-col gap-4">
+
+        <!-- --- SCREEN: START --- -->
+        <div id="start-screen" class="text-center space-y-8 py-10 animate-in fade-in zoom-in duration-500">
+            <div class="relative inline-block">
+                <div class="absolute -inset-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg blur opacity-75 animate-pulse"></div>
+                <h1 class="relative text-5xl md:text-6xl font-bold text-white tracking-tighter p-2">
+                    TEMPLE OF SIGMA
+                </h1>
+            </div>
+            <p class="text-xl text-blue-200 tracking-widest uppercase">Overdrive: Probability Distributions</p>
+            
+            <div class="bg-slate-900/90 border border-slate-700 p-8 rounded-xl shadow-2xl max-w-2xl mx-auto backdrop-blur-md">
+                <p class="mb-6 text-lg text-slate-300">
+                    Identify the governing <strong>Probability Distribution</strong> behind the chaotic data streams.
+                </p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                    <button onclick="prepareGame(15)" class="btn-neon bg-green-900/40 border border-green-500 text-green-400 hover:bg-green-500 hover:text-black font-bold py-4 rounded">
+                        <div>NOVICE</div><div class="text-xs opacity-75">15 Mins</div>
+                    </button>
+                    <button onclick="prepareGame(10)" class="btn-neon bg-blue-900/40 border border-blue-500 text-blue-400 hover:bg-blue-500 hover:text-black font-bold py-4 rounded">
+                        <div>ADEPT</div><div class="text-xs opacity-75">10 Mins</div>
+                    </button>
+                    <button onclick="prepareGame(5)" class="btn-neon bg-purple-900/40 border border-purple-500 text-purple-400 hover:bg-purple-500 hover:text-black font-bold py-4 rounded">
+                        <div>OVERDRIVE</div><div class="text-xs opacity-75">5 Mins</div>
+                    </button>
+                </div>
+                
+                <button onclick="showLibrary()" class="text-slate-500 hover:text-white underline text-sm flex items-center justify-center w-full transition-colors">
+                    <i data-lucide="book-open" class="w-4 h-4 mr-2"></i> Open Codex (Reference)
+                </button>
+            </div>
+        </div>
+
+        <!-- --- SCREEN: BATTLE (HUD + GAME) --- -->
+        <div id="battle-screen" class="hidden flex-col gap-4 w-full max-w-4xl mx-auto">
+            
+            <!-- HUD -->
+            <div class="flex flex-wrap justify-between items-center bg-slate-900/80 border-b-2 border-slate-700 p-3 sticky top-0 z-30 backdrop-blur-md rounded-b-xl shadow-lg">
+                <div class="flex items-center gap-2 w-1/3" id="lives-container">
+                    <!-- Hearts injected here -->
+                </div>
+                
+                <div id="timer-display" class="font-mono text-2xl text-yellow-400 border border-yellow-600/50 bg-yellow-900/20 px-4 py-1 rounded">
+                    00:00
+                </div>
+                
+                <!-- UPDATED RIGHT HUD -->
+                <div class="w-1/3 flex flex-col items-end">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-xs text-slate-400 uppercase font-bold tracking-widest">Progress</span>
+                        <span class="text-sm font-bold text-white bg-slate-800 px-2 py-0.5 rounded border border-slate-600">
+                            <span id="hud-q-current">1</span> / 10
+                        </span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs text-slate-500 uppercase tracking-widest">Score</span>
+                        <span class="text-xl font-bold text-blue-400" id="score-display">0</span>
+                    </div>
+                </div>
+                
+                <div id="time-warning" class="hidden absolute top-full left-0 w-full text-center bg-red-900/90 text-red-200 text-xs font-bold py-1 animate-pulse">
+                    TEMPORAL ANOMALY DETECTED
+                </div>
+            </div>
+
+            <!-- MAIN CARD AREA (INCREASED HEIGHT) -->
+            <!-- Changed min-h-[300px] to min-h-[450px] md:min-h-[550px] -->
+            <div id="game-card" class="bg-slate-800/50 border border-slate-600 p-6 rounded-xl relative overflow-hidden min-h-[450px] md:min-h-[550px] flex flex-col transition-all duration-300">
+                <div class="flex justify-between items-start mb-4">
+                    <span></span> 
+                    <span id="diff-badge" class="text-xs font-bold text-purple-400 border border-purple-500/50 px-2 py-1 rounded">HARD</span>
+                </div>
+
+                <!-- Scenario Text -->
+                <div class="flex-grow flex flex-col items-center justify-center text-center mb-6 z-10 relative">
+                    <div class="w-16 h-16 bg-slate-700/50 rounded-full flex items-center justify-center mb-4 neon-border-blue">
+                        <i data-lucide="box" class="w-8 h-8 text-blue-400"></i>
+                    </div>
+                    <h2 class="text-xl md:text-2xl font-bold text-white mb-2" id="scenario-title">Scenario Title</h2>
+                    <p class="text-slate-300 text-sm md:text-base max-w-lg leading-relaxed" id="scenario-desc">
+                        Scenario description...
+                    </p>
+                </div>
+
+                <!-- Visualization Canvas -->
+                <div class="w-full h-32 mb-4 rounded border border-slate-700/50 relative overflow-hidden">
+                    <canvas id="viz-canvas"></canvas>
+                    <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20">
+                        <i data-lucide="activity" class="w-12 h-12 text-blue-500"></i>
+                    </div>
+                </div>
+
+                <!-- Reaction Overlay -->
+                <div id="reaction-overlay" class="hidden absolute inset-0 bg-slate-950/95 z-40 flex flex-col items-center justify-center p-4">
+                    <!-- Injected Content -->
+                </div>
+            </div>
+
+            <!-- INTERACTION PANEL -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                
+                <!-- Left: Tools -->
+                <div class="lg:col-span-1 space-y-2">
+                    <!-- Deep Logic Scan -->
+                    <button onclick="revealDeepLogic()" id="btn-deep-logic" class="w-full btn-neon flex items-center justify-between bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 px-4 py-3 rounded group">
+                        <span class="flex items-center"><i data-lucide="brain-circuit" class="w-4 h-4 mr-2 text-purple-400"></i> Deep Logic</span>
+                        <span class="text-xs bg-slate-900 px-2 py-1 rounded text-purple-300 group-hover:bg-purple-900 transition-colors">-20 Pts</span>
+                    </button>
+                    
+                    <!-- Hint -->
+                    <button onclick="revealHint()" id="btn-hint" class="w-full btn-neon flex items-center justify-between bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 px-4 py-3 rounded group">
+                        <span class="flex items-center"><i data-lucide="lightbulb" class="w-4 h-4 mr-2 text-yellow-400"></i> Get Hint</span>
+                        <span class="text-xs bg-slate-900 px-2 py-1 rounded text-yellow-300 group-hover:bg-yellow-900 transition-colors">-25 Pts</span>
+                    </button>
+
+                    <!-- ADDED: Surrender / Reveal Answer -->
+                    <button onclick="revealAnswer()" id="btn-reveal" class="w-full btn-neon flex items-center justify-between bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 px-4 py-3 rounded group">
+                        <span class="flex items-center"><i data-lucide="alert-triangle" class="w-4 h-4 mr-2 text-red-400"></i> Surrender</span>
+                        <span class="text-xs bg-slate-900 px-2 py-1 rounded text-red-300 group-hover:bg-red-900 transition-colors">-100 Pts</span>
+                    </button>
+
+                    <!-- Grimoire Toggle -->
+                    <button onclick="toggleGrimoire()" class="w-full btn-neon flex items-center justify-center bg-slate-900/50 hover:bg-slate-800 border border-slate-700 text-slate-400 text-xs py-2 rounded mt-2">
+                        <i data-lucide="book" class="w-3 h-3 mr-2"></i> <span id="grimoire-status">Open Codex (-50)</span>
+                    </button>
+                </div>
+
+                <!-- Right: Distribution Selection -->
+                <div class="lg:col-span-2 bg-slate-800 border border-slate-600 p-4 rounded-xl relative">
+                    <div class="absolute top-0 right-0 bg-blue-600 text-xs font-bold px-2 py-1 rounded-bl text-white">SELECT DISTRIBUTION</div>
+                    
+                    <!-- Spell Tooltip -->
+                    <div id="spell-tooltip" class="mb-3 min-h-[2.5rem] flex items-center justify-center text-center text-xs text-blue-200 italic bg-slate-900/50 rounded border border-blue-900/30 p-2">
+                        <div id="tooltip-locked" class="flex items-center gap-2">
+                            <i data-lucide="lock" class="w-3 h-3"></i> 
+                            <span>Information Obscured. <button onclick="unlockTooltips()" class="underline text-blue-400 hover:text-blue-300">Identify (-20)</button></span>
+                        </div>
+                        <div id="tooltip-active" class="hidden w-full">Hover to identify distribution properties...</div>
+                    </div>
+
+                    <div id="options-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        <!-- Buttons injected JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Information Panels (Hidden by default) -->
+            <div id="panel-deep-logic" class="hidden bg-purple-900/20 border border-purple-500/30 p-4 rounded animate-in slide-in-from-left">
+                <h4 class="text-purple-400 font-bold text-sm mb-1"><i data-lucide="cpu" class="w-3 h-3 inline mr-1"></i> LOGIC CORE ANALYSIS</h4>
+                <div id="deep-logic-text" class="text-sm text-slate-300 space-y-1">...</div>
+            </div>
+
+            <div id="panel-hint" class="hidden bg-yellow-900/20 border border-yellow-500/30 p-4 rounded animate-in slide-in-from-left">
+                <h4 class="text-yellow-400 font-bold text-sm mb-1"><i data-lucide="zap" class="w-3 h-3 inline mr-1"></i> SIGNAL DECRYPTED</h4>
+                <p id="hint-text" class="text-sm text-slate-300">...</p>
+            </div>
+
+            <!-- Grimoire Overlay (In-line) -->
+            <div id="grimoire-container" class="hidden bg-slate-900 border border-slate-500 p-4 rounded mt-4 h-64 overflow-y-auto text-sm force-scroll">
+                <!-- Content injected -->
+            </div>
+
+        </div>
+
+        <!-- --- ADDED: REVEAL MODAL (Expanded Height) --- -->
+        <!-- Added min-h-[60vh] to make it spacious by default -->
+        <div id="reveal-modal" class="hidden fixed inset-0 bg-slate-950/95 z-50 flex items-center justify-center p-4">
+            <div class="bg-slate-900 border-2 border-red-500 rounded-lg p-6 max-w-lg w-full shadow-2xl relative animate-pop flex flex-col max-h-[80vh] min-h-[60vh]">
+                <button onclick="closeReveal()" class="absolute top-2 right-2 text-slate-400 hover:text-white"><i data-lucide="x" class="w-6 h-6"></i></button>
+                
+                <div class="flex-shrink-0 mb-4 text-center">
+                    <h2 class="text-3xl font-bold text-red-500 flex items-center justify-center gap-3 border-b border-slate-800 pb-2">
+                        <i data-lucide="alert-triangle" class="w-8 h-8"></i> CLASSIFIED DATA
+                    </h2>
+                </div>
+                
+                <div class="flex-1 min-h-0 overflow-y-auto force-scroll space-y-6 pr-2">
+                    <div class="bg-slate-800 p-4 rounded border border-slate-700">
+                        <p class="text-xs text-slate-500 uppercase tracking-widest mb-2">The Correct Model Was:</p>
+                        <p id="reveal-correct-dist" class="text-2xl font-bold text-white"></p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-500 uppercase tracking-widest mb-2">Deep Logic:</p>
+                        <div id="reveal-explanation" class="text-blue-200 text-sm leading-relaxed"></div>
+                    </div>
+                </div>
+                
+                <div class="flex-shrink-0 mt-6">
+                    <button onclick="finishReveal()" class="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded border border-slate-600 shadow-lg">Close & Continue</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- --- SCREEN: GAME OVER --- -->
+        <div id="gameover-screen" class="hidden flex-col items-center justify-center min-h-[60vh] space-y-6 text-center animate-in zoom-in">
+            <i data-lucide="skull" class="w-20 h-20 text-red-500"></i>
+            <h1 class="text-5xl font-bold text-white">SYSTEM FAILURE</h1>
+            <p class="text-xl text-red-400 font-mono" id="gameover-reason">LIVES DEPLETED</p>
+            <div class="flex gap-4">
+                <button onclick="resetGame()" class="btn-neon bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded">REBOOT SYSTEM</button>
+                <button onclick="showLibrary()" class="btn-neon bg-slate-700 hover:bg-slate-600 text-white py-3 px-6 rounded">ACCESS LOGS</button>
+            </div>
+        </div>
+
+        <!-- --- SCREEN: VICTORY --- -->
+        <div id="victory-screen" class="hidden flex-col items-center justify-center min-h-[60vh] space-y-6 text-center animate-in zoom-in">
+            <div class="text-6xl animate-bounce">💠</div>
+            <h1 class="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-green-400">
+                PROBABILITY MASTERED
+            </h1>
+            <p id="victory-msg" class="text-lg text-slate-300 max-w-md">The chaos has been ordered.</p>
+            
+            <div class="grid grid-cols-2 gap-4 w-full max-w-md">
+                <div class="bg-slate-800 p-4 rounded border border-slate-700">
+                    <div class="text-slate-500 text-xs uppercase">Final Score</div>
+                    <div class="text-3xl font-bold text-white" id="final-score">0</div>
+                </div>
+                <div class="bg-slate-800 p-4 rounded border border-slate-700">
+                    <div class="text-slate-500 text-xs uppercase">Time Left</div>
+                    <div class="text-3xl font-bold text-green-400" id="final-time">00:00</div>
+                </div>
+            </div>
+
+            <button onclick="resetGame()" class="btn-neon bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-10 rounded shadow-[0_0_15px_rgba(37,99,235,0.5)]">
+                NEXT SIMULATION
+            </button>
+        </div>
+
+        <!-- --- SCREEN: LIBRARY --- -->
+        <div id="library-screen" class="hidden w-full max-w-4xl pt-4">
+            <div class="flex items-center gap-4 mb-6 border-b border-slate-700 pb-4">
+                <button onclick="returnToStart()" class="p-2 bg-slate-800 rounded hover:bg-slate-700 text-white"><i data-lucide="arrow-left" class="w-6 h-6"></i></button>
+                <h1 class="text-2xl font-bold text-white">The Codex</h1>
+            </div>
+            <div id="library-content" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Injected -->
+            </div>
+        </div>
+
+    </div>
+
+    <!-- LOGIC -->
+    <script>
+        // --- DATA: Probability Distributions ---
+        const distributions = [
+            { id: 'binomial', name: "Binomial", desc: "Discrete. Success/Fail in N fixed trials. Independent events.", tooltip: "Used for: Number of successes in a fixed number of independent trials (e.g., Coin flips, Pass/Fail rates)." },
+            { id: 'poisson', name: "Poisson", desc: "Discrete. Events occurring in a fixed interval of time/space.", tooltip: "Used for: Rare events, arrivals, counts per unit (e.g., Calls per hour, Defects per meter)." },
+            { id: 'normal', name: "Normal", desc: "Continuous. Bell-shaped. Defined by Mean and SD.", tooltip: "Used for: Natural phenomena, measurement errors, heights, weights, test scores. Symmetric." },
+            { id: 'uniform', name: "Uniform", desc: "Continuous. All outcomes equally likely between A and B.", tooltip: "Used for: 'Flat' probability. Random number generation, waiting time for a bus arriving regularly." },
+            { id: 'exponential', name: "Exponential", desc: "Continuous. Time between events in a Poisson process.", tooltip: "Used for: Waiting times, time until failure, survival analysis. Memoryless property." },
+            { id: 'geometric', name: "Geometric", desc: "Discrete. Trials needed to get the FIRST success.", tooltip: "Used for: Number of attempts until a success occurs (e.g., How many drills until finding oil)." },
+            { id: 'hypergeometric', name: "Hypergeometric", desc: "Discrete. Successes in N draws WITHOUT replacement.", tooltip: "Used for: Sampling without replacement from a small finite population (e.g., Drawing aces from a deck)." }
+        ];
+
+        // --- POOL OF 50 SCENARIOS ---
+        const scenarioPool = [
+            // === EASY ===
+            { text: "Predicting the number of Heads in 10 flips of a fair coin.", answer: 'binomial', diff: 'Easy', clue: "Fixed number of trials (10), Binary outcome (Heads/Tails).", logic: "1. Fixed number of trials? Yes (N=10).\n2. Binary outcome? Yes (Head/Tail).\n3. Independent trials? Yes.\n→ Counting successes in fixed trials defines the **Binomial Distribution**." },
+            { text: "Quality Control: Number of defective widgets in a batch of 50, where 5% are usually defective.", answer: 'binomial', diff: 'Easy', clue: "Fixed batch size, Defect is Yes/No.", logic: "1. Fixed sample size? Yes (N=50).\n2. Binary outcome? Yes (Defective/OK).\n3. Constant probability? Yes (5%).\n→ Standard model for batch defects." },
+            { text: "Number of emails arriving in your inbox between 9am and 10am.", answer: 'poisson', diff: 'Easy', clue: "Counting events over a time interval.", logic: "1. Counting discrete events? Yes (emails).\n2. Fixed time interval? Yes (1 hour).\n3. Events independent? Yes.\n→ Counting arrivals over time is the **Poisson Distribution**." },
+            { text: "Customers arriving at a bank counter per hour.", answer: 'poisson', diff: 'Easy', clue: "Arrival rate.", logic: "1. Counting arrivals? Yes.\n2. Per unit of time? Yes.\n3. Independence? Assumed.\n→ Classic arrival process model." },
+            { text: "Distribution of heights of adult men in the UK.", answer: 'normal', diff: 'Easy', clue: "Natural biological measurement, Bell curve.", logic: "1. Is the data continuous? Yes.\n2. Is it symmetric? Yes.\n3. Does it cluster around a mean? Yes.\n→ Natural biological measurements typically follow the **Normal Distribution**." },
+            { text: "IQ scores in the general population.", answer: 'normal', diff: 'Easy', clue: "Standardized test scores.", logic: "1. Continuous scale? Yes.\n2. Defined by Mean and SD? Yes.\n3. Bell-shaped? Yes.\n→ Standardized tests are designed to be **Normal**." },
+            { text: "Rolling a single fair 6-sided die.", answer: 'uniform', diff: 'Easy', clue: "1, 2, 3, 4, 5, 6 all have same chance.", logic: "1. Discrete set of values? Yes.\n2. Does every value have the exact same probability? Yes.\n→ This is a **Discrete Uniform Distribution**." },
+            { text: "Random number generator output between 0.00 and 1.00.", answer: 'uniform', diff: 'Easy', clue: "No preference for any number.", logic: "1. Continuous range? Yes.\n2. Equal likelihood for any value? Yes.\n→ RNGs are designed to create a **Continuous Uniform Distribution**." },
+            { text: "Flipping a coin until you get a Heads.", answer: 'geometric', diff: 'Easy', clue: "Keep going until success.", logic: "1. Repeated Bernoulli trials? Yes.\n2. Looking for the 1st occurrence? Yes.\n→ Waiting for the first success in discrete steps is **Geometric**." },
+            { text: "Whether a single student passes or fails a test.", answer: 'binomial', diff: 'Easy', clue: "Single trial (N=1).", logic: "1. Binary outcome? Yes.\n2. Single trial? Yes.\n→ A single Bernoulli trial is a special case of **Binomial** (where N=1)." },
+            
+            // === MEDIUM ===
+            { text: "Probability that exactly 3 out of 8 patients recover from a treatment.", answer: 'binomial', diff: 'Medium', clue: "Small N, Recovery is binary.", logic: "1. Fixed N? Yes (8).\n2. Binary outcome? Yes (Recover/Not).\n3. Constant probability? Yes.\n→ Discrete count of successes in N trials is **Binomial**." },
+            { text: "Number of potholes on a 5-mile stretch of road.", answer: 'poisson', diff: 'Medium', clue: "Counting defects over a distance.", logic: "1. Count data? Yes.\n2. Fixed unit of space? Yes (5 miles).\n3. Random occurrence? Yes.\n→ Events distributed over space follow **Poisson**." },
+            { text: "The time you have to wait until the next customer arrives.", answer: 'exponential', diff: 'Medium', clue: "Time UNTIL the next event.", logic: "1. Continuous time? Yes.\n2. Related to arrival rate? Yes.\n3. Modeling the 'gap' between events? Yes.\n→ Waiting times between Poisson events follow **Exponential**." },
+            { text: "Number of job interviews needed until you get your first offer.", answer: 'geometric', diff: 'Medium', clue: "Trials UNTIL first success.", logic: "1. Sequence of trials? Yes.\n2. Stop condition? Yes (First Success).\n3. Binary outcome per trial? Yes.\n→ Counting trials until success is **Geometric**." },
+            { text: "Selecting a committee of 4 from 10 men and 10 women (count of women).", answer: 'hypergeometric', diff: 'Medium', clue: "Finite population, group selection.", logic: "1. Small finite pool? Yes (20 people).\n2. Drawing a subset? Yes.\n3. Without replacement? Yes.\n→ Sampling from a finite group without replacement is **Hypergeometric**." },
+            { text: "Number of cars passing a bridge in 24 hours.", answer: 'poisson', diff: 'Medium', clue: "Count over a long interval.", logic: "1. Counting events? Yes.\n2. Fixed large time window? Yes.\n3. Events independent? Assumed.\n→ Rate-based counts over time are **Poisson**." },
+            { text: "Temperature in a room controlled by a thermostat (fluctuates slightly).", answer: 'normal', diff: 'Medium', clue: "Continuous fluctuation around a set point.", logic: "1. Continuous measurement? Yes.\n2. Central tendency? Yes (Set point).\n3. Symmetric noise? Yes.\n→ Error/fluctuation around a mean is **Normal**." },
+            
+            // === HARD/BOSS ===
+            { text: "Measurement error in a precision weighing scale.", answer: 'normal', diff: 'Hard', clue: "Errors usually cluster around zero.", logic: "1. Small random errors? Yes.\n2. Sum of many factors? Yes.\n3. Central Limit Theorem? Applies.\n→ Errors converge to **Normal**." },
+            { text: "The lifetime of a radioactive particle before it decays.", answer: 'exponential', diff: 'Hard', clue: "Decay / Failure time.", logic: "1. Time to failure? Yes.\n2. Constant hazard rate? Yes.\n3. Memoryless? Yes.\n→ Decay and failure times are modeled by **Exponential**." },
+            { text: "Drawing 5 cards from a deck and getting 3 Aces (No reshuffling).", answer: 'hypergeometric', diff: 'Hard', clue: "Sampling WITHOUT replacement.", logic: "1. Finite population? Yes (52 cards).\n2. Two groups? Yes (Aces vs Others).\n3. Replacement? No.\n→ Dependent trials without replacement define **Hypergeometric**." },
+            { text: "Time between two consecutive earthquakes in a region.", answer: 'exponential', diff: 'Hard', clue: "Time gap between rare events.", logic: "1. Continuous time? Yes.\n2. Between rare events? Yes.\n3. Poisson underlying process? Yes.\n→ The time gap between Poisson events is **Exponential**." },
+            { text: "Lottery: Matching 6 numbers out of 49 drawn balls.", answer: 'hypergeometric', diff: 'Hard', clue: "Balls are not put back in the machine.", logic: "1. Finite total? Yes (49 balls).\n2. Target subset? Yes (Winning numbers).\n3. No replacement? Yes.\n→ Drawing a specific subset without replacement is **Hypergeometric**." },
+            { text: "Capture-recapture: Estimating fish in a lake.", answer: 'hypergeometric', diff: 'Hard', clue: "Tagged vs Untagged.", logic: "1. Finite population? Yes.\n2. Two groups? Yes.\n3. Sampling without replacement? Yes.\n→ Hypergeometric." },
+            { text: "Number of attempts to guess a 4-digit pin (randomly).", answer: 'geometric', diff: 'Boss', clue: "Until correct.", logic: "1. Discrete tries? Yes.\n2. Stop on success? Yes.\n→ Geometric (until success)." },
+            { text: "Number of chocolate chips in a cookie.", answer: 'poisson', diff: 'Boss', clue: "Volume distribution.", logic: "1. Discrete? Yes.\n2. Fixed volume? Yes.\n3. Random mixing? Yes.\n→ Poisson." }
+        ];
+
+        // --- STATE ---
+        let state = {
+            screen: 'start', lives: 3, score: 0, index: 0, 
+            initialTime: 300, timeLeft: 300, timerId: null,
+            currentRun: [], 
+            tooltipsUnlocked: false,
+            processing: false
+        };
+
+        const els = {};
+
+        // --- INIT ---
+        window.addEventListener('DOMContentLoaded', () => {
+            // Map Elements
+            ['start', 'battle', 'gameover', 'victory', 'library'].forEach(id => els[id] = document.getElementById(`${id}-screen`));
+            
+            els.lives = document.getElementById('lives-container');
+            els.timer = document.getElementById('timer-display');
+            els.score = document.getElementById('score-display');
+            els.warning = document.getElementById('time-warning');
+            els.hudQCurrent = document.getElementById('hud-q-current'); 
+            
+            els.diffBadge = document.getElementById('diff-badge');
+            els.cardTitle = document.getElementById('scenario-title');
+            els.cardDesc = document.getElementById('scenario-desc');
+            els.overlay = document.getElementById('reaction-overlay');
+            els.gameCard = document.getElementById('game-card');
+            
+            els.btnDeep = document.getElementById('btn-deep-logic');
+            els.btnHint = document.getElementById('btn-hint');
+            els.btnReveal = document.getElementById('btn-reveal'); // Mapped
+            
+            els.panelDeep = document.getElementById('panel-deep-logic');
+            els.panelHint = document.getElementById('panel-hint');
+            
+            els.revealModal = document.getElementById('reveal-modal'); // Mapped
+            els.revealCorrectDist = document.getElementById('reveal-correct-dist');
+            els.revealExplanation = document.getElementById('reveal-explanation');
+            
+            els.grimoireStatus = document.getElementById('grimoire-status');
+            els.grimoireContainer = document.getElementById('grimoire-container');
+            
+            els.optionsGrid = document.getElementById('options-grid');
+            els.tooltipLocked = document.getElementById('tooltip-locked');
+            els.tooltipActive = document.getElementById('tooltip-active');
+            
+            // Build UI
+            lucide.createIcons();
+            buildLibrary();
+            buildGrimoire();
+            buildOptionButtons();
+            
+            drawViz();
+        });
+
+        // --- GAME LOGIC ---
+
+        function prepareGame(minutes) {
+            const totalSeconds = minutes * 60;
+            const easy = scenarioPool.filter(s => s.diff === 'Easy');
+            const medium = scenarioPool.filter(s => s.diff === 'Medium');
+            const hard = scenarioPool.filter(s => s.diff === 'Hard' || s.diff === 'Boss');
+            const shuffle = (arr) => arr.sort(() => 0.5 - Math.random());
+
+            const run = [
+                ...shuffle(easy).slice(0, 3),
+                ...shuffle(medium).slice(0, 4),
+                ...shuffle(hard).slice(0, 3)
+            ];
+
+            state = {
+                screen: 'battle', lives: 3, score: 0, index: 0,
+                initialTime: totalSeconds, timeLeft: totalSeconds, timerId: null,
+                currentRun: run,
+                tooltipsUnlocked: false, processing: false
+            };
+            
+            startGame();
+        }
+
+        function startGame() {
+            showScreen('battle');
+            state.timerId = setInterval(gameLoop, 1000);
+            loadLevel();
+            updateHUD();
+        }
+
+        function gameLoop() {
+            state.timeLeft--;
+            if(state.timeLeft <= 0) gameOver("TIME EXPIRED");
+            updateHUD();
+        }
+
+        function loadLevel() {
+            const sc = state.currentRun[state.index];
+            els.cardTitle.innerText = "Data Stream Incoming...";
+            els.cardDesc.innerText = sc.text;
+            els.diffBadge.innerText = sc.diff;
+            
+            let badgeColor = 'text-green-400 border-green-500/50';
+            if(sc.diff === 'Medium') badgeColor = 'text-yellow-400 border-yellow-500/50';
+            if(sc.diff === 'Hard' || sc.diff === 'Boss') badgeColor = 'text-red-400 border-red-500/50';
+            els.diffBadge.className = `text-xs font-bold px-2 py-1 rounded border ${badgeColor}`;
+
+            // Reset Panels & Overlays
+            els.panelDeep.classList.add('hidden');
+            els.panelHint.classList.add('hidden');
+            els.overlay.classList.add('hidden');
+            els.revealModal.classList.add('hidden'); // Ensure modal is hidden
+            els.gameCard.classList.remove('animate-shake');
+            
+            // Reset Buttons
+            els.btnDeep.disabled = false;
+            els.btnDeep.classList.remove('opacity-50', 'cursor-not-allowed');
+            els.btnHint.disabled = false;
+            els.btnHint.classList.remove('opacity-50', 'cursor-not-allowed');
+            els.btnReveal.disabled = false; // Reset reveal
+            els.btnReveal.classList.remove('opacity-50', 'cursor-not-allowed');
+            
+            // Reset Tooltips
+            state.tooltipsUnlocked = false;
+            els.tooltipLocked.classList.remove('hidden');
+            els.tooltipActive.classList.add('hidden');
+            
+            // Parse logic for the hidden panels
+            const logicHtml = sc.logic.split('\n').map(line => {
+                if(line.trim().startsWith('→')) return `<div class="logic-conclusion">${line}</div>`;
+                return `<div class="logic-step">${line}</div>`;
+            }).join('');
+            
+            document.getElementById('deep-logic-text').innerHTML = logicHtml;
+            document.getElementById('hint-text').innerText = sc.clue;
+            
+            state.processing = false;
+        }
+
+        // --- NEW REVEAL LOGIC ---
+        function revealAnswer() {
+            state.score -= 100;
+            updateHUD();
+            
+            const sc = state.currentRun[state.index];
+            const distName = distributions.find(d => d.id === sc.answer)?.name || "Unknown";
+            
+            // Parse logic for the modal
+            const logicHtml = sc.logic.split('\n').map(line => {
+                if(line.trim().startsWith('→')) return `<div class="logic-conclusion">${line}</div>`;
+                return `<div class="logic-step">${line}</div>`;
+            }).join('');
+
+            els.revealCorrectDist.innerText = distName;
+            els.revealExplanation.innerHTML = logicHtml;
+            
+            els.revealModal.classList.remove('hidden');
+            els.revealModal.classList.add('flex');
+        }
+
+        function finishReveal() {
+            closeReveal();
+            nextLevel();
+        }
+
+        function closeReveal() {
+            els.revealModal.classList.add('hidden');
+            els.revealModal.classList.remove('flex');
+        }
+        // -------------------------
+
+        function handleAnswer(distId) {
+            if(state.processing) return;
+            state.processing = true;
+            
+            const sc = state.currentRun[state.index];
+            if(distId === sc.answer) {
+                spawnFloatingText(els.score, "+100", "#4ade80");
+                state.score += 100;
+                showReaction(true, "Distribution Identified!");
+            } else {
+                state.lives--;
+                updateHUD();
+                
+                els.gameCard.classList.remove('animate-shake');
+                void els.gameCard.offsetWidth; 
+                els.gameCard.classList.add('animate-shake');
+                
+                if(state.lives <= 0) {
+                    setTimeout(() => gameOver("SIGNAL LOST (0 Lives)"), 500);
+                } else {
+                    showReaction(false, "Incorrect Model!");
+                }
+            }
+        }
+
+        function showReaction(isSuccess, msg) {
+            els.overlay.classList.remove('hidden');
+            const sc = state.currentRun[state.index]; 
+
+            if(isSuccess) {
+                triggerConfetti();
+                const distName = distributions.find(d => d.id === sc.answer)?.name || "Correct Distribution";
+                
+                const logicHtml = sc.logic.split('\n').map(line => {
+                    if(line.trim().startsWith('→')) return `<div class="logic-conclusion">${line}</div>`;
+                    return `<div class="logic-step">${line}</div>`;
+                }).join('');
+
+                els.overlay.innerHTML = `
+                    <div class="animate-pop flex flex-col items-center max-w-2xl w-full mx-4 my-auto h-full">
+                        <div class="bg-green-500/20 p-4 rounded-full mb-4 ring-2 ring-green-500 ring-offset-2 ring-offset-slate-900 mt-8 flex-shrink-0">
+                            <i data-lucide="check" class="w-8 h-8 text-green-400"></i>
+                        </div>
+                        <h2 class="text-3xl font-bold text-white mb-1 flex-shrink-0">EXCELLENT</h2>
+                        <p class="text-green-400 text-sm font-bold tracking-widest uppercase mb-6 flex-shrink-0">${distName} Identified</p>
+                        
+                        <!-- SCROLLABLE CONTAINER (Flex + min-h-0 + force-scroll) -->
+                        <div class="flex-1 min-h-0 w-full overflow-y-auto force-scroll mb-6 pr-2">
+                            <div class="bg-slate-900 border-l-4 border-green-500 p-6 rounded-r-lg text-left shadow-2xl">
+                                <p class="text-slate-400 text-xs uppercase font-bold mb-2">Scenario Analysis</p>
+                                <p class="text-slate-300 text-sm italic mb-6 opacity-80 leading-relaxed">"${sc.text}"</p>
+                                
+                                <p class="text-blue-400 text-xs uppercase font-bold mb-3">The Logic</p>
+                                <div class="text-white text-sm font-medium">${logicHtml}</div>
+                            </div>
+                        </div>
+
+                        <button onclick="nextLevel()" class="flex-shrink-0 btn-neon bg-green-600 hover:bg-green-500 text-black font-bold py-3 px-12 rounded shadow-[0_0_20px_rgba(34,197,94,0.4)] w-full sm:w-auto mb-12">
+                            NEXT DATA STREAM
+                        </button>
+                    </div>
+                `;
+            } else {
+                els.overlay.innerHTML = `
+                    <div class="animate-pop flex flex-col items-center justify-center h-full">
+                        <i data-lucide="x-circle" class="w-16 h-16 text-red-500 mb-4 animate-glitch"></i>
+                        <h2 class="text-3xl font-bold text-red-500 mb-2">ERROR</h2>
+                        <p class="text-red-200 mb-6">${msg}</p>
+                        <button onclick="closeOverlay()" class="btn-neon bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 px-8 rounded">RETRY</button>
+                    </div>
+                `;
+            }
+            lucide.createIcons();
+        }
+
+        function nextLevel() {
+            state.index++;
+            if(state.index >= 10) {
+                victory();
+            } else {
+                loadLevel();
+                updateHUD();
+            }
+        }
+
+        function closeOverlay() {
+            els.overlay.classList.add('hidden');
+            state.processing = false;
+        }
+
+        // --- HELPERS ---
+
+        function revealDeepLogic() {
+            if(state.score > 0) state.score = Math.max(0, state.score - 20);
+            els.panelDeep.classList.remove('hidden');
+            els.btnDeep.disabled = true;
+            els.btnDeep.classList.add('opacity-50', 'cursor-not-allowed');
+            updateHUD();
+        }
+
+        function revealHint() {
+            if(state.score > 0) state.score = Math.max(0, state.score - 25);
+            els.panelHint.classList.remove('hidden');
+            els.btnHint.disabled = true;
+            els.btnHint.classList.add('opacity-50', 'cursor-not-allowed');
+            updateHUD();
+        }
+
+        function toggleGrimoire() {
+            if(els.grimoireContainer.classList.contains('hidden')) {
+                if(state.score > 0) state.score = Math.max(0, state.score - 50);
+                els.grimoireContainer.classList.remove('hidden');
+                els.grimoireStatus.innerText = "Close Codex";
+                updateHUD();
+            } else {
+                els.grimoireContainer.classList.add('hidden');
+            }
+        }
+
+        function unlockTooltips() {
+            if(state.score > 0) state.score = Math.max(0, state.score - 20);
+            state.tooltipsUnlocked = true;
+            els.tooltipLocked.classList.add('hidden');
+            els.tooltipActive.classList.remove('hidden');
+            updateHUD();
+        }
+
+        function updateHover(id) {
+            if(!state.tooltipsUnlocked) return;
+            const dist = distributions.find(d => d.id === id);
+            if(dist) {
+                els.tooltipActive.innerHTML = `<span class="text-blue-300 font-bold">${dist.name}:</span> ${dist.desc}`;
+            }
+        }
+
+        function resetHover() {
+            if(!state.tooltipsUnlocked) return;
+            els.tooltipActive.innerHTML = "Hover to identify distribution properties...";
+        }
+
+        // --- UI UPDATES ---
+
+        function updateHUD() {
+            els.score.innerText = state.score;
+            if(els.hudQCurrent) els.hudQCurrent.innerText = state.index + 1;
+            
+            const m = Math.floor(state.timeLeft / 60);
+            const s = (state.timeLeft % 60).toString().padStart(2, '0');
+            els.timer.innerText = `${m}:${s}`;
+            
+            if(state.timeLeft < 60) {
+                els.timer.classList.add('text-red-500', 'animate-pulse');
+                els.warning.classList.remove('hidden');
+            } else {
+                els.timer.classList.remove('text-red-500', 'animate-pulse');
+                els.warning.classList.add('hidden');
+            }
+
+            els.lives.innerHTML = Array(3).fill(0).map((_, i) => 
+                `<i data-lucide="heart" class="w-6 h-6 ${i < state.lives ? 'text-red-500 fill-red-500' : 'text-slate-700 fill-slate-800'}"></i>`
+            ).join('');
+            lucide.createIcons();
+        }
+
+        function showScreen(id) {
+            Object.values(els).forEach(el => {
+                if(el && el.id && el.id.includes('screen')) {
+                    el.classList.remove('flex');
+                    el.classList.add('hidden');
+                }
+            });
+            const target = document.getElementById(`${id}-screen`);
+            target.classList.remove('hidden');
+            target.classList.add('flex');
+        }
+
+        function spawnFloatingText(targetEl, text, color) {
+            // Placeholder
+        }
+
+        // --- GENERATORS ---
+
+        function buildOptionButtons() {
+            els.optionsGrid.innerHTML = distributions.map(d => `
+                <button 
+                    onclick="handleAnswer('${d.id}')"
+                    onmouseenter="updateHover('${d.id}')"
+                    onmouseleave="resetHover()"
+                    class="btn-neon bg-slate-700 hover:bg-blue-600 text-white text-xs py-3 px-1 rounded border border-slate-600 hover:border-blue-400 transition-all">
+                    ${d.name}
+                </button>
+            `).join('');
+        }
+
+        function buildGrimoire() {
+            els.grimoireContainer.innerHTML = distributions.map(d => `
+                <div class="mb-3 border-b border-slate-800 pb-2">
+                    <strong class="text-blue-400">${d.name}</strong>
+                    <p class="text-xs text-slate-400">${d.desc}</p>
+                    <p class="text-xs text-slate-500 italic mt-1">${d.tooltip}</p>
+                </div>
+            `).join('');
+        }
+
+        function buildLibrary() {
+            const libContent = document.getElementById('library-content');
+            libContent.innerHTML = distributions.map(d => `
+                <div class="bg-slate-800 p-4 rounded border border-slate-700">
+                    <h3 class="text-lg font-bold text-white mb-2">${d.name}</h3>
+                    <p class="text-sm text-slate-300 mb-2">${d.desc}</p>
+                    <div class="bg-slate-900 p-2 rounded text-xs text-blue-200">
+                        <i data-lucide="info" class="w-3 h-3 inline mr-1"></i> ${d.tooltip}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function drawViz() {
+            const cvs = document.getElementById('viz-canvas');
+            const ctx = cvs.getContext('2d');
+            cvs.width = cvs.offsetWidth;
+            cvs.height = cvs.offsetHeight;
+            
+            let offset = 0;
+            function animate() {
+                ctx.clearRect(0, 0, cvs.width, cvs.height);
+                ctx.beginPath();
+                ctx.strokeStyle = '#4ade80';
+                ctx.lineWidth = 2;
+                for(let i=0; i<cvs.width; i++) {
+                    ctx.lineTo(i, cvs.height/2 + Math.sin((i + offset) * 0.05) * 20);
+                }
+                ctx.stroke();
+                offset += 2;
+                requestAnimationFrame(animate);
+            }
+            animate();
+        }
+
+        function resetGame() {
+            clearInterval(state.timerId);
+            showScreen('start');
+        }
+        function returnToStart() { resetGame(); }
+        function showLibrary() { showScreen('library'); }
+        function victory() {
+            clearInterval(state.timerId);
+            document.getElementById('final-score').innerText = state.score;
+            document.getElementById('final-time').innerText = els.timer.innerText;
+            showScreen('victory');
+        }
+        function gameOver(reason) {
+            clearInterval(state.timerId);
+            document.getElementById('gameover-reason').innerText = reason;
+            showScreen('gameover');
+        }
+
+        function triggerConfetti() {
+            const colors = ['#00e0ff', '#4ade80', '#f87171', '#ffd666'];
+            for(let i=0; i<30; i++) {
+                const el = document.createElement('div');
+                el.className = 'confetti-piece';
+                el.style.backgroundColor = colors[Math.floor(Math.random()*colors.length)];
+                el.style.left = Math.random()*100 + 'vw';
+                el.style.animation = `fall ${2+Math.random()*3}s linear forwards`;
+                document.body.appendChild(el);
+                setTimeout(() => el.remove(), 5000);
+            }
+        }
+
+    </script>
+</body>
+</html>

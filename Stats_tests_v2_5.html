@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stats RPG: The sigma Dungeon</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            overflow-x: hidden;
+        }
+
+        /* --- FORCE SCROLLBAR VISIBILITY (High Contrast) --- */
+        .force-scroll::-webkit-scrollbar {
+            width: 14px; /* Even wider for visibility */
+        }
+
+        .force-scroll::-webkit-scrollbar-track {
+            background: #0f172a;
+            border-left: 1px solid #334155;
+        }
+
+        .force-scroll::-webkit-scrollbar-thumb {
+            background-color: #64748b; /* Visible Slate-500 */
+            border-radius: 6px;
+            border: 3px solid #0f172a; /* Creates padding effect */
+        }
+
+        .force-scroll::-webkit-scrollbar-thumb:hover {
+            background-color: #94a3b8; /* Lighter on hover */
+        }
+
+        /* Firefox */
+        .force-scroll {
+            scrollbar-width: auto;
+            scrollbar-color: #64748b #0f172a;
+        }
+
+        /* --- ANIMATIONS --- */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+        .animate-shake { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+
+        @keyframes popIn {
+            0% { transform: scale(0) rotate(-45deg); opacity: 0; }
+            70% { transform: scale(1.2) rotate(10deg); opacity: 1; }
+            100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+        .animate-pop { animation: popIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+
+        @keyframes glitch {
+            0% { transform: translate(0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+            100% { transform: translate(0); }
+        }
+        .animate-glitch { 
+            animation: glitch 0.3s cubic-bezier(.25, .46, .45, .94) both;
+            color: #ef4444; 
+        }
+
+        @keyframes scan-sweep {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        .scanning-effect {
+            background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(59, 130, 246, 0.3) 50%, rgba(255,255,255,0) 100%);
+            background-size: 200% 100%;
+            animation: scan-sweep 1.5s linear forwards;
+        }
+
+        @keyframes float-up-fade {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-30px) scale(1.2); opacity: 0; }
+        }
+        .floating-text {
+            position: absolute;
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 100;
+            animation: float-up-fade 1s ease-out forwards;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); opacity: 0.6; }
+            50% { transform: translateY(-10px); opacity: 1; }
+        }
+        .animate-float { animation: float 3s ease-in-out infinite; }
+        
+        @keyframes fall {
+            0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+        }
+        .confetti-piece {
+            position: absolute; width: 10px; height: 10px; top: 0; pointer-events: none; z-index: 50;
+        }
+
+        .btn-press:active {
+            transform: scale(0.95);
+            background-color: #581c87;
+        }
+        
+        .blur-sm-custom {
+            filter: blur(4px);
+            user-select: none;
+        }
+    </style>
+</head>
+<body id="main-body" class="bg-slate-900 text-slate-100 min-h-screen flex flex-col items-center justify-center p-4 relative">
+
+    <div id="app" class="max-w-4xl w-full z-10 relative">
+        
+        <!-- SCREEN: START -->
+        <div id="start-screen" class="text-center space-y-8 fade-in">
+            <h1 class="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">
+                STATS RPG
+            </h1>
+            <p class="text-xl text-slate-400">The sigma Dungeon: Gauntlet Mode</p>
+            
+            <div class="bg-slate-800 border-2 border-slate-600 rounded-lg p-6 shadow-xl max-w-2xl mx-auto">
+                <p class="mb-4 text-lg">
+                    Welcome, Data Wizard. Choose your difficulty level to begin.
+                </p>
+                
+                <div class="grid grid-cols-1 gap-3 max-w-md mx-auto text-sm text-slate-300 mb-6 text-left">
+                     <div class="flex items-center p-2 bg-slate-800 rounded border border-slate-700">
+                        <i data-lucide="heart" class="w-5 h-5 mr-3 text-red-500 flex-shrink-0"></i>
+                        <span><strong>3 Lives.</strong> 3 mistakes and you're out.</span>
+                    </div>
+                    <div class="flex items-center p-2 bg-slate-800 rounded border border-slate-700">
+                        <i data-lucide="shuffle" class="w-5 h-5 mr-3 text-purple-400 flex-shrink-0"></i>
+                        <span><strong>10 Random Questions.</strong> Drawn from a pool of 30.</span>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <div class="text-sm text-slate-400 uppercase font-bold tracking-widest mb-2">Select Time Limit</div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <button onclick="prepareGame(15)" class="bg-green-700 hover:bg-green-600 border-b-4 border-green-900 text-white font-bold py-3 px-2 rounded active:border-b-0 active:translate-y-1 transition-all">
+                            <div>NOVICE</div>
+                            <div class="text-xs opacity-75 font-normal">15 Minutes</div>
+                        </button>
+                        <button onclick="prepareGame(10)" class="bg-blue-700 hover:bg-blue-600 border-b-4 border-blue-900 text-white font-bold py-3 px-2 rounded active:border-b-0 active:translate-y-1 transition-all">
+                            <div>RESEARCHER</div>
+                            <div class="text-xs opacity-75 font-normal">10 Minutes</div>
+                        </button>
+                         <button onclick="prepareGame(5)" class="bg-purple-700 hover:bg-purple-600 border-b-4 border-purple-900 text-white font-bold py-3 px-2 rounded active:border-b-0 active:translate-y-1 transition-all">
+                            <div>SIGMA EXPERT</div>
+                            <div class="text-xs opacity-75 font-normal">5 Minutes</div>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mt-8 pt-6 border-t border-slate-700">
+                     <button onclick="showLibrary()" class="text-slate-400 hover:text-white underline text-sm flex items-center justify-center w-full">
+                        <i data-lucide="library" class="w-4 h-4 mr-2"></i> Access Grand Archives
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SCREEN: TUTORIAL -->
+        <div id="tutorial-screen" class="hidden fade-in flex flex-col items-center justify-center min-h-[50vh]">
+            <h2 class="text-3xl font-bold text-yellow-400 mb-6 tracking-widest border-b-2 border-yellow-600 pb-2">COMBAT MANUAL</h2>
+            
+            <div class="flex items-stretch justify-center gap-6 w-full max-w-4xl">
+                <!-- Left Animation -->
+                <div class="w-16 flex flex-col justify-around items-center opacity-50">
+                    <i data-lucide="sigma" class="w-8 h-8 text-blue-400 animate-float"></i>
+                    <i data-lucide="bar-chart-2" class="w-8 h-8 text-purple-400 animate-float" style="animation-delay: 0.5s;"></i>
+                    <i data-lucide="activity" class="w-8 h-8 text-green-400 animate-float" style="animation-delay: 1s;"></i>
+                </div>
+
+                <!-- Content with FORCED SCROLLBAR (Flex Min-H-0 Technique) -->
+                <div class="bg-slate-800 border-2 border-slate-600 rounded-lg p-6 shadow-2xl flex-1 text-center flex flex-col max-h-[70vh]">
+                    <div class="flex-shrink-0 mb-4">
+                        <p class="text-lg text-slate-300">
+                            Identify the <strong>Scenario</strong> and cast the correct <strong>Statistical Test</strong>.
+                        </p>
+                    </div>
+                    
+                    <div class="flex-1 min-h-0 overflow-y-auto force-scroll border-t border-slate-600 pt-4 text-left pr-2">
+                        <h3 class="font-bold text-yellow-400 text-center uppercase tracking-widest text-sm mb-2">Rewards & Costs</h3>
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between bg-green-900/30 border border-green-700/50 p-3 rounded">
+                                <div class="flex items-center gap-3"><i data-lucide="check-circle" class="w-5 h-5 text-green-400"></i> <span class="text-slate-200 text-sm font-bold">Correct Answer</span></div>
+                                <span class="text-green-400 font-bold text-lg">+100 pts</span>
+                            </div>
+                            <div class="flex items-center justify-between bg-yellow-900/30 border border-yellow-700/50 p-3 rounded">
+                                <div class="flex items-center gap-3"><i data-lucide="star" class="w-5 h-5 text-yellow-400"></i> <span class="text-slate-200 text-sm font-bold">Effect Size Bonus</span></div>
+                                <span class="text-yellow-400 font-bold text-lg">+50 pts</span>
+                            </div>
+                            <div class="flex items-center justify-between bg-red-900/30 border border-red-700/50 p-3 rounded">
+                                <div class="flex items-center gap-3"><i data-lucide="alert-triangle" class="w-5 h-5 text-red-400"></i> <div class="flex flex-col leading-tight"><span class="text-slate-200 text-sm font-bold">Surrender</span><span class="text-xs text-red-300 italic">Reveals answer</span></div></div>
+                                <span class="text-red-400 font-bold text-lg">-100 pts</span>
+                            </div>
+                             <div class="flex items-center justify-between bg-red-900/30 border border-red-700/50 p-3 rounded">
+                                <div class="flex items-center gap-3"><i data-lucide="book-open" class="w-5 h-5 text-red-400"></i> <div class="flex flex-col leading-tight"><span class="text-slate-200 text-sm font-bold">Open Grimoire</span><span class="text-xs text-red-300 italic">Access full cheat sheet</span></div></div>
+                                <span class="text-red-400 font-bold text-lg">-50 pts</span>
+                            </div>
+                            <div class="flex items-center justify-between bg-red-900/30 border border-red-700/50 p-3 rounded">
+                                <div class="flex items-center gap-3"><i data-lucide="lightbulb" class="w-5 h-5 text-red-400"></i> <div class="flex flex-col leading-tight"><span class="text-slate-200 text-sm font-bold">Hint</span><span class="text-xs text-red-300 italic">Specific clue</span></div></div>
+                                <span class="text-red-400 font-bold text-lg">-25 pts</span>
+                            </div>
+                            <div class="flex items-center justify-between bg-red-900/30 border border-red-700/50 p-3 rounded">
+                                <div class="flex items-center gap-3"><i data-lucide="eye" class="w-5 h-5 text-red-400"></i> <div class="flex flex-col leading-tight"><span class="text-slate-200 text-sm font-bold">Identify Spells</span><span class="text-xs text-red-300 italic">Unlocks tooltips for 1 turn</span></div></div>
+                                <span class="text-red-400 font-bold text-lg">-20 pts</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex-shrink-0 mt-4">
+                        <button onclick="startActualGame()" class="w-full bg-blue-600 hover:bg-blue-500 border-b-4 border-blue-800 text-white font-bold py-4 rounded text-xl animate-pulse active:border-b-0 active:translate-y-1 transition-all">
+                            ENTER DUNGEON
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Right Animation -->
+                <div class="w-16 flex flex-col justify-around items-center opacity-50">
+                    <i data-lucide="pie-chart" class="w-8 h-8 text-red-400 animate-float" style="animation-delay: 0.5s;"></i>
+                    <i data-lucide="sigma" class="w-8 h-8 text-yellow-400 animate-float" style="animation-delay: 1s;"></i>
+                    <i data-lucide="line-chart" class="w-8 h-8 text-cyan-400 animate-float" style="animation-delay: 1.5s;"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- SCREEN: BATTLE -->
+        <div id="battle-screen" class="hidden fade-in flex-col gap-4">
+            
+            <!-- HUD -->
+            <div class="flex flex-wrap gap-4 justify-between items-center mb-2 bg-slate-800 p-3 rounded-lg border border-slate-700 shadow-lg sticky top-0 z-20">
+                <div class="flex items-center gap-1 w-1/3" id="lives-container"></div>
+                <div id="timer-display" class="flex items-center gap-2 px-4 py-1 rounded font-bold text-2xl border-2 bg-slate-900 border-slate-600 text-yellow-400 transition-colors duration-300">
+                    <i data-lucide="timer" class="w-6 h-6"></i>
+                    <span id="time-text">05:00</span>
+                </div>
+                <div class="w-1/3 text-right">
+                    <div class="text-xs text-slate-400">Question <span id="question-num">1</span>/<span id="total-q">10</span></div>
+                    <div class="text-xl font-bold text-blue-300">Score: <span id="score-display">0</span></div>
+                </div>
+                <div id="time-warning" class="w-full text-center text-red-400 text-sm font-bold animate-pulse hidden">
+                    WARNING: TIME CRITICAL
+                </div>
+            </div>
+
+            <!-- SCENARIO CARD (TALLER VERSION) -->
+            <div id="game-card" class="bg-slate-800 border-2 border-slate-600 rounded-lg p-6 shadow-xl min-h-[350px] md:min-h-[420px] flex flex-col justify-center items-center text-center relative overflow-hidden transition-all duration-200">
+                <div class="absolute top-2 right-2 px-2 py-1 bg-slate-700 rounded text-xs text-slate-300 border border-slate-600">
+                    Diff: <span id="difficulty-badge" class="text-white">Easy</span>
+                </div>
+                
+                <div class="mb-4 relative">
+                    <div id="monster-container" class="w-24 h-24 bg-slate-700 rounded-full mx-auto mb-4 flex items-center justify-center border-4 border-slate-600 shadow-inner transition-transform duration-300">
+                        <i id="monster-icon" data-lucide="skull" class="w-12 h-12 text-slate-400"></i>
+                    </div>
+                    <h2 class="text-xl font-bold text-white mb-2">Wild Dataset Appeared!</h2>
+                    <p id="scenario-desc" class="text-lg text-blue-200">Loading...</p>
+                </div>
+
+                <!-- CLUE BOX -->
+                <div id="clue-container" class="w-full max-w-md mt-4 hidden">
+                    <div class="bg-yellow-900/40 border border-yellow-600/50 p-3 rounded text-yellow-200 text-sm animate-pulse">
+                        <strong><i data-lucide="lightbulb" class="w-4 h-4 inline mr-1"></i> Hint:</strong>
+                        <span id="clue-text">...</span>
+                    </div>
+                </div>
+
+                <!-- REACTION OVERLAY (Target for Popups) -->
+                <div id="reaction-overlay" class="hidden absolute inset-0 bg-slate-900/95 z-30 flex flex-col items-center justify-center p-6"></div>
+            </div>
+
+            <!-- SCANNING INTERFACE -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div id="data-card" class="bg-slate-800 border-2 border-slate-600 rounded-lg p-4 shadow-xl relative overflow-hidden">
+                    <div class="flex justify-between items-center mb-2 z-10 relative">
+                        <h3 class="text-sm font-bold text-slate-400 uppercase">Data Scan</h3>
+                        <button id="scan-data-btn" onclick="revealData()" class="bg-slate-600 hover:bg-slate-500 border-b-2 border-slate-800 text-slate-200 px-3 py-1 rounded text-xs">
+                            <i data-lucide="brain" class="w-3 h-3 inline mr-1"></i> Scan
+                        </button>
+                    </div>
+                    <div id="data-info-hidden" class="h-12 flex items-center justify-center text-slate-600 italic z-10 relative">Unknown data structure...</div>
+                    <div id="data-info-revealed" class="hidden space-y-1 fade-in z-10 relative">
+                        <div class="flex justify-between"><span class="text-slate-500">Type:</span> <span id="data-type-val" class="text-blue-300"></span></div>
+                        <div class="flex justify-between"><span class="text-slate-500">Design:</span> <span id="design-val" class="text-blue-300"></span></div>
+                    </div>
+                </div>
+
+                <div id="assump-card" class="bg-slate-800 border-2 border-slate-600 rounded-lg p-4 shadow-xl relative overflow-hidden">
+                     <div class="flex justify-between items-center mb-2 z-10 relative">
+                        <h3 class="text-sm font-bold text-slate-400 uppercase">Assumption Aura</h3>
+                        <button id="scan-assumptions-btn" onclick="revealAssumptions()" class="bg-slate-600 hover:bg-slate-500 border-b-2 border-slate-800 text-slate-200 px-3 py-1 rounded text-xs">
+                            <i data-lucide="activity" class="w-3 h-3 inline mr-1"></i> Check
+                        </button>
+                    </div>
+                    <div id="assumptions-info-hidden" class="h-12 flex items-center justify-center text-slate-600 italic z-10 relative">Aura obscured...</div>
+                    <div id="assumptions-info-revealed" class="hidden space-y-1 fade-in text-sm z-10 relative"></div>
+                </div>
+            </div>
+
+            <!-- SPELLBOOK -->
+            <div class="bg-slate-800 border-2 border-slate-600 rounded-lg p-4 shadow-xl mb-6 relative">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-bold text-purple-400 flex items-center">
+                        <i data-lucide="sword" class="w-5 h-5 mr-2"></i> Cast Statistical Spell
+                    </h3>
+                    <div class="flex gap-2">
+                        <button onclick="revealClue()" id="clue-btn" class="text-xs bg-yellow-900/50 hover:bg-yellow-800 text-yellow-200 px-2 py-1 rounded border border-yellow-700/50 flex items-center" title="Get a specific hint for this problem">
+                            <i data-lucide="lightbulb" class="w-3 h-3 mr-1"></i> Hint (-25)
+                        </button>
+                        <!-- Reveal Answer Button -->
+                        <button onclick="revealAnswer()" id="reveal-btn" class="text-xs bg-red-900/50 hover:bg-red-800 text-red-200 px-2 py-1 rounded border border-red-700/50 flex items-center" title="Give up and see the answer">
+                            <i data-lucide="alert-circle" class="w-3 h-3 mr-1"></i> Reveal (-100)
+                        </button>
+                        <button onclick="toggleGrimoire()" class="text-xs bg-blue-900/50 hover:bg-blue-800 text-blue-200 px-2 py-1 rounded border border-blue-700/50 flex items-center" title="Open full rulebook">
+                            <i data-lucide="book-open" class="w-3 h-3 mr-1"></i> <span id="grimoire-toggle-text">Open Grimoire (-50)</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="grimoire-content" class="hidden bg-yellow-900/30 border border-yellow-700/50 p-4 rounded mb-4 text-xs text-yellow-200 gap-2 max-h-64 overflow-y-auto">
+                    <!-- Populated via JS -->
+                </div>
+
+                <div id="spell-buttons" class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+                    <!-- Buttons injected via JS -->
+                </div>
+
+                <!-- DESCRIPTION TOOLTIP -->
+                <div class="bg-slate-900/80 border border-slate-700 rounded p-3 min-h-[60px] flex items-center justify-center text-center transition-all duration-300 relative overflow-hidden" id="spell-tooltip-box">
+                    <div id="tooltip-locked-content" class="flex flex-col items-center">
+                        <span class="text-slate-500 italic text-sm mb-1">Spell details obscured by Fog of War.</span>
+                        <button onclick="unlockTooltips()" id="unlock-tooltip-btn" class="text-xs bg-purple-900/80 hover:bg-purple-700 border border-purple-500 text-purple-200 px-3 py-1 rounded flex items-center">
+                            <i data-lucide="eye" class="w-3 h-3 mr-1"></i> Identify Spells (-20 pts)
+                        </button>
+                    </div>
+                    <div id="tooltip-active-content" class="hidden w-full">
+                        <span class="text-slate-500 italic text-sm">Hover over a spell to reveal its effect...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- REVEAL ANSWER MODAL (Flex Fix) -->
+        <div id="reveal-modal" class="hidden fixed inset-0 bg-slate-900/95 z-50 flex items-center justify-center p-4">
+            <div class="bg-slate-800 border-2 border-red-500 rounded-lg p-6 max-w-lg w-full shadow-2xl relative animate-pop flex flex-col max-h-[80vh]">
+                <button onclick="closeReveal()" class="absolute top-2 right-2 text-slate-400 hover:text-white"><i data-lucide="x" class="w-6 h-6"></i></button>
+                <div class="flex-shrink-0 mb-4">
+                    <h2 class="text-3xl font-bold text-red-500 flex items-center gap-3 border-b border-slate-700 pb-2">
+                        <i data-lucide="alert-triangle" class="w-8 h-8"></i> CLASSIFIED INTEL
+                    </h2>
+                </div>
+                
+                <div class="flex-1 min-h-0 overflow-y-auto force-scroll space-y-6 pr-2">
+                    <div class="bg-slate-900/50 p-4 rounded border border-slate-700">
+                        <p class="text-xs text-slate-500 uppercase tracking-widest mb-2">The Correct Spell Was:</p>
+                        <p id="reveal-correct-test" class="text-2xl font-bold text-white"></p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-500 uppercase tracking-widest mb-2">Reasoning:</p>
+                        <p id="reveal-explanation" class="text-blue-200 text-sm leading-relaxed"></p>
+                    </div>
+                </div>
+                
+                <div class="flex-shrink-0 mt-6">
+                    <button onclick="finishReveal()" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded border border-slate-500 shadow-lg">Close & Continue</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SCREEN: EFFECT SIZE -->
+        <div id="effect-size-screen" class="hidden fade-in text-center max-w-lg mx-auto">
+             <div class="bg-slate-800 border-2 border-yellow-500/50 rounded-lg p-8 shadow-xl">
+                <h3 class="text-center text-xl font-bold text-yellow-400 mb-2">BONUS ROUND</h3>
+                <p class="text-center mb-6">
+                  Calculated <strong id="es-metric">Metric</strong>: <span id="es-value" class="text-3xl font-bold text-white block mt-2">0.00</span>
+                </p>
+                <div class="flex justify-center gap-4">
+                     <button onclick="guessEffectSize('Small')" class="w-full border border-slate-500 hover:bg-slate-700 text-slate-300 font-bold py-2 px-4 rounded">Small</button>
+                     <button onclick="guessEffectSize('Medium')" class="w-full border border-slate-500 hover:bg-slate-700 text-slate-300 font-bold py-2 px-4 rounded">Medium</button>
+                     <button onclick="guessEffectSize('Large')" class="w-full border border-slate-500 hover:bg-slate-700 text-slate-300 font-bold py-2 px-4 rounded">Large</button>
+                </div>
+                <div class="mt-4 text-xs text-center text-slate-500">
+                    Hint: η²: S(0.01) M(0.06) L(0.14) | d: S(0.2) M(0.5) L(0.8)
+                </div>
+             </div>
+        </div>
+
+        <!-- SCREEN: GAME OVER -->
+        <div id="gameover-screen" class="hidden fade-in text-center space-y-6">
+            <h1 class="text-5xl font-bold text-red-500 flex items-center justify-center"><i data-lucide="skull" class="w-16 h-16 mr-4"></i> GAME OVER</h1>
+            <p id="gameover-reason" class="text-2xl text-white font-bold">LIVES DEPLETED</p>
+            <p class="text-slate-400">You reached Question <span id="gameover-q">1</span>/10</p>
+            <div class="flex justify-center gap-4">
+                <button onclick="returnToStart()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded">Try Again</button>
+                <button onclick="showLibrary()" class="bg-slate-600 hover:bg-slate-500 text-slate-200 font-bold py-3 px-6 rounded">Study Failure (Archives)</button>
+            </div>
+        </div>
+
+        <!-- SCREEN: VICTORY -->
+        <div id="victory-screen" class="hidden fade-in flex flex-col items-center justify-center min-h-[50vh] space-y-6">
+            <div class="text-6xl animate-bounce">🏆</div>
+            <h1 class="text-4xl font-bold text-yellow-400">SIGNIFICANT RESULT!</h1>
+            <p id="victory-msg" class="text-xl text-blue-200 font-bold max-w-lg text-center"></p>
+            <div class="bg-slate-800 border-2 border-yellow-500/50 p-6 rounded-lg shadow-2xl w-full max-w-md grid grid-cols-2 gap-4">
+                <div class="text-center p-2 bg-slate-900/50 rounded"><p class="text-slate-400 text-xs uppercase mb-1">Score</p><p id="final-score" class="text-4xl font-bold text-white">0</p></div>
+                <div class="text-center p-2 bg-slate-900/50 rounded"><p class="text-slate-400 text-xs uppercase mb-1">Time</p><span id="final-time-taken" class="text-green-400 text-xl font-bold">00:00</span></div>
+            </div>
+            <div class="flex gap-4 mt-6">
+                <button onclick="returnToStart()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded">Play Again</button>
+            </div>
+        </div>
+
+        <!-- SCREEN: LIBRARY -->
+        <div id="library-screen" class="hidden fade-in max-w-4xl mx-auto w-full">
+            <div class="flex items-center gap-4 mb-6">
+                <button onclick="returnToStart()" class="p-2 bg-slate-800 rounded hover:bg-slate-700 text-white"><i data-lucide="arrow-left" class="w-6 h-6"></i></button>
+                <h1 class="text-3xl font-bold text-yellow-400 flex items-center"><i data-lucide="book-open" class="w-8 h-8 mr-3"></i> Grand Archives</h1>
+            </div>
+            <div id="library-content" class="space-y-8"></div>
+        </div>
+
+    </div>
+
+    <!-- GAME LOGIC -->
+    <script>
+        const knowledgeBase = {
+            'Independent t-test': { desc: "Compare means of 2 independent groups. Requires: Normality & Equal Variances.", details: "Parametric. Use when comparing two separate groups (e.g., Treatment vs Control). Assumptions: Data is continuous, normally distributed, and variances are equal (Levene's > .05)." },
+            'Welch’s t-test': { desc: "Compare means of 2 independent groups. Use when Variances are UNEQUAL.", details: "Parametric (Robust). Use instead of Student's t-test when Levene's test is significant (p < .05), indicating variances are not equal between groups." },
+            'Mann-Whitney U Test': { desc: "Compare ranks of 2 independent groups. Use for Non-Normal or Ordinal data.", details: "Non-Parametric. Compares distributions (medians/ranks) of two independent groups. Use when data is skewed, ordinal (1-5 scales), or sample size is very small." },
+            'Paired t-test': { desc: "Compare means of 2 related groups (e.g., Before vs After). Normal differences.", details: "Parametric. Tests if the mean difference between paired observations is zero. Use for repeated measures on the same subjects or matched pairs." },
+            'Wilcoxon Signed-Rank': { desc: "Compare ranks of 2 related groups. Non-Normal differences.", details: "Non-Parametric. The alternative to Paired t-test. Use when the differences between paired scores are not normally distributed." },
+            'One-way ANOVA': { desc: "Compare means of 3+ independent groups. Normal & Equal Variances.", details: "Parametric. Omnibus test for differences among 3 or more group means. If significant, use Post-hoc tests to find which specific groups differ." },
+            'Kruskal-Wallis': { desc: "Compare ranks of 3+ independent groups. Non-Normal data.", details: "Non-Parametric. The 'ANOVA on Ranks'. Use when comparing 3+ groups that have skewed distributions or ordinal data." },
+            'Repeated Measures ANOVA': { desc: "Compare means of 3+ related groups (Time points). Assumes Sphericity.", details: "Parametric. Tracks changes within the same subjects over 3+ time points. Requires Sphericity (Mauchly's test > .05)." },
+            'Greenhouse-Geisser': { desc: "Correction for RM ANOVA when Sphericity is violated.", details: "Correction. Use this output row in SPSS/Jamovi if Mauchly's test for Sphericity is significant (p < .05). Adjusts Degrees of Freedom to be conservative." },
+            'Two-way ANOVA': { desc: "Test effects of 2 independent factors & their interaction.", details: "Parametric. Factorial design. Tests Main Effect A, Main Effect B, and the Interaction (AxB) on a continuous outcome." },
+            'Chi-Square Test': { desc: "Test association between 2 categorical variables. Large sample.", details: "Non-Parametric. Tests independence of two categorical variables. Requirement: Expected cell counts must be ≥ 5 in at least 80% of cells." },
+            'Fisher’s Exact Test': { desc: "Test association between 2 categorical variables. Small sample.", details: "Non-Parametric. Use instead of Chi-Square when sample size is small (Expected counts < 5). Calculates exact probabilities." },
+            'McNemar Test': { desc: "Test change in paired binary outcomes (2 time points).", details: "Non-Parametric. Tests if proportions change in the same group (e.g., Yes/No Before vs Yes/No After). Focuses on discordant pairs." },
+            'Cochran’s Q': { desc: "Test change in binary outcomes across 3+ time points.", details: "Non-Parametric. Extension of McNemar for 3 or more repeated measurements of a binary variable (Pass/Fail at T1, T2, T3)." },
+            'Pearson Correlation': { desc: "Measure linear relationship between 2 continuous variables.", details: "Parametric. Measures strength and direction (-1 to +1) of a linear relationship. Assumptions: Normality, Linearity, Homoscedasticity." },
+            'Spearman’s Rank Correlation': { desc: "Measure monotonic relationship. Non-Normal or Ordinal data.", details: "Non-Parametric. Correlations on ranks. Use when relationship is monotonic but not linear, or data contains outliers/ranks." }
+        };
+
+        const scenarioPool = [
+            { id: 1, difficulty: 'Easy', clue: "Two independent groups. Data is continuous and follows the rules (Normal + Equal Variances).", description: "Compare means of two independent groups (Class A vs Class B).", dataType: "Continuous", design: "Independent observations", assumptions: { normality: 'Met', homogeneity: 'Met' }, correctTest: 'Independent t-test', explanation: "We are comparing the means of two distinct groups (Independent) using continuous data. Since both the Normality assumption and Homogeneity of Variance (Levene's test > .05) are met, the standard Independent t-test is the most powerful and appropriate choice.", effectSize: { metric: 'Cohen’s d', value: 0.55, interpretation: 'Medium' } },
+            { id: 12, difficulty: 'Easy', clue: "Two continuous variables. You want to see if they move together in a straight line (Linearity).", description: "Measure linear association between Study Hours and Test Score.", dataType: "Continuous", design: "Correlation", assumptions: { linearity: 'Met', normality: 'Met' }, correctTest: 'Pearson Correlation', explanation: "You have two continuous variables and are checking for a relationship (Association), not a difference. Because the data is Normally distributed and the relationship is Linear, Pearson's r is the correct parametric test.", effectSize: null },
+            { id: 9, difficulty: 'Easy', clue: "Categorical data (Counts). Your sample is large enough (Expected counts ≥ 5).", description: "Test association between Gender (M/F) and Voting Preference (Yes/No).", dataType: "Categorical", design: "Independent samples", assumptions: { expectedCounts: 'Met' }, correctTest: 'Chi-Square Test', explanation: "Both variables are categorical (nominal). You are looking for an association (Are gender and voting linked?). Since the sample size is sufficient (Expected cell counts ≥ 5), the standard Chi-Square Test of Independence is used.", effectSize: { metric: 'Cohen’s d', value: 0.1, interpretation: 'Small' } },
+            { id: 3, difficulty: 'Medium', clue: "Same subjects measured twice (Before/After). The changes (differences) are Normally distributed.", description: "Compare means of Anxiety levels Before and After therapy.", dataType: "Continuous", design: "Before–after / Matched pairs", assumptions: { normality: 'Met' }, correctTest: 'Paired t-test', explanation: "The key here is that the same people are measured twice (Repeated/Paired). We are interested in the difference (Before vs After). Since the differences are Normally distributed, the Paired t-test is required.", effectSize: { metric: 'Cohen’s d', value: 0.85, interpretation: 'Large' } },
+            { id: 5, difficulty: 'Medium', clue: "Comparing means of 3 or more groups. All standard assumptions (Normality, Homogeneity) are safe.", description: "Compare means across 3 independent fertilizer groups.", dataType: "Continuous", design: "Multi-group parametric comparison (≥3 groups)", assumptions: { normality: 'Met', homogeneity: 'Met' }, correctTest: 'One-way ANOVA', explanation: "We have 3 or more independent groups. You cannot use multiple t-tests because it increases the error rate. Since Normality and Homogeneity are met, the One-way ANOVA is the correct omnibus test.", effectSize: { metric: 'Eta squared (η²)', value: 0.07, interpretation: 'Medium' } },
+            { id: 16, difficulty: 'Medium', clue: "Two independent groups, BUT the data is Ordinal (ranks) or not Normal. Parametric tests won't work.", description: "Compare Happiness Ratings (1-10) between two independent departments.", dataType: "Ordinal / Non-normal", design: "Independent observations (2 groups)", assumptions: { normality: 'Violated' }, correctTest: 'Mann-Whitney U Test', explanation: "You have two independent groups, but the outcome is Ordinal (1-10 scale) or Non-normal. The t-test assumes normality. Therefore, you must use the non-parametric equivalent, which compares ranks: the Mann-Whitney U Test.", effectSize: { metric: 'Eta squared (η²)', value: 0.15, interpretation: 'Large' } },
+            { id: 2, difficulty: 'Hard', clue: "Two independent groups, BUT their variances are different (Levene's test failed). You need a correction.", description: "Compare salary expectations between Arts and Science students.", dataType: "Continuous", design: "Independent observations", assumptions: { normality: 'Met', homogeneity: 'Violated' }, correctTest: 'Welch’s t-test', explanation: "This looks like a standard t-test, but the Assumption of Homogeneity of Variances is violated (Levene's test p < .05). This means the spread of data in the two groups is very different. You must use Welch’s t-test, which corrects for this.", effectSize: { metric: 'Cohen’s d', value: 0.25, interpretation: 'Small' } },
+            { id: 10, difficulty: 'Hard', clue: "Categorical data, BUT your sample is too small (Expected count < 5). Chi-Square is inaccurate here.", description: "Association between Rare Disease and Mutation. Sample is very small.", dataType: "Categorical", design: "Independent samples", assumptions: { expectedCounts: 'Violated' }, correctTest: 'Fisher’s Exact Test', explanation: "Like Chi-Square, we are testing the association between two categorical variables. However, the sample is small (Expected counts < 5). Chi-Square results would be inaccurate, so we calculate the exact probability using Fisher's Exact Test.", effectSize: null },
+            { id: 8, difficulty: 'Hard', clue: "Repeated measures (3+ times), BUT the correlation between time points varies (Sphericity failed).", description: "Tracking heart rate during Rest, Exercise, and Recovery (3 time points).", dataType: "Continuous", design: "Repeated measures (Within-subjects)", assumptions: { normality: 'Met', sphericity: 'Violated' }, correctTest: 'Greenhouse-Geisser', explanation: "We are measuring the same subjects 3+ times (Repeated Measures ANOVA). However, the assumption of Sphericity (Mauchly's test) is violated. We must apply a correction to the Degrees of Freedom to avoid a Type I error. The standard correction is Greenhouse-Geisser.", effectSize: { metric: 'Eta squared (η²)', value: 0.20, interpretation: 'Large' } },
+            { id: 6, difficulty: 'Boss', clue: "3 or more independent groups, BUT the data is not Normal. You need the non-parametric version of ANOVA.", description: "Compare reaction times across 3 age groups. Data is heavily skewed.", dataType: "Continuous (Non-normal)", design: "Independent groups (≥3)", assumptions: { normality: 'Violated' }, correctTest: 'Kruskal-Wallis', explanation: "We have 3+ groups, so usually we'd use ANOVA. But the data is skewed/non-normal, violating the ANOVA assumption. The non-parametric alternative that compares mean ranks across 3+ groups is the Kruskal-Wallis H test.", effectSize: { metric: 'Eta squared (η²)', value: 0.15, interpretation: 'Large' } },
+            { id: 15, difficulty: 'Boss', clue: "Binary data (Yes/No) measured across 3 or more time points for the same people.", description: "Compare Pass/Fail rates across 3 different exams taken by the same students.", dataType: "Categorical (Binary)", design: "Same participants, ≥3 conditions", assumptions: {}, correctTest: 'Cochran’s Q', explanation: "We are tracking a Binary outcome (Pass/Fail) across 3+ repeated time points for the same subjects. McNemar is for 2 points; ANOVA is for continuous data. For 3+ repeated binary measures, Cochran's Q is the correct test.", effectSize: null },
+            { id: 17, difficulty: 'Medium', clue: "Same subjects measured twice (Before/After), BUT the differences are skewed (Not Normal). Use ranks.", description: "Rate pain (1-10) Before and After treatment. Differences are skewed.", dataType: "Ordinal / Non-normal", design: "Paired/Repeated (2 time points)", assumptions: { normality: 'Violated' }, correctTest: 'Wilcoxon Signed-Rank', explanation: "This is a paired design (Before vs After), but the data is Ordinal/Skewed. We cannot use the Paired t-test because the differences aren't normal. The non-parametric equivalent is the Wilcoxon Signed-Rank Test.", effectSize: { metric: 'Cohen’s d', value: 0.4, interpretation: 'Small' } },
+            { id: 18, difficulty: 'Medium', clue: "Two continuous variables (ranks), or the relationship isn't linear. Use the non-parametric correlation.", description: "Relationship between Finish Position (1st, 2nd...) and Training Hours.", dataType: "Ordinal / Continuous", design: "Correlation", assumptions: { linearity: 'Violated' }, correctTest: 'Spearman’s Rank Correlation', explanation: "We are looking for a relationship (correlation). One variable is Ordinal (Finish Position) or the relationship is not a straight line (Linearity violated). Pearson is invalid here. We use Spearman's Rho, which correlates the ranks.", effectSize: null },
+            { id: 19, difficulty: 'Hard', clue: "Same subjects measured 3+ times. Assumptions (Sphericity) are met.", description: "Blood pressure measured at 8am, 12pm, and 4pm (Same people). Assumptions met.", dataType: "Continuous", design: "Repeated measures (3+ time points)", assumptions: { normality: 'Met', sphericity: 'Met' }, correctTest: 'Repeated Measures ANOVA', explanation: "We are tracking the same subjects across 3 time points. Since Sphericity (equality of variances of differences) is met, we can use the standard Repeated Measures ANOVA without correction.", effectSize: { metric: 'Eta squared (η²)', value: 0.05, interpretation: 'Small' } },
+            { id: 20, difficulty: 'Hard', clue: "Paired categorical data (Yes/No). Did the proportion change Pre vs Post?", description: "Did you pass the test? (Yes/No). Measured Before vs After tutoring.", dataType: "Categorical (Binary)", design: "Paired (2 time points)", assumptions: {}, correctTest: 'McNemar Test', explanation: "We have paired data (Before/After) but the outcome is Binary (Yes/No). We are testing if people switched from No->Yes or Yes->No. The McNemar Test is specifically designed for 2x2 paired contingency tables.", effectSize: null },
+            { id: 21, difficulty: 'Boss', clue: "Two independent factors (e.g. Diet & Exercise) affecting one outcome.", description: "Testing the effect of Dosage (High/Low) AND Gender (M/F) on recovery time.", dataType: "Continuous", design: "Factorial (2 Independent Variables)", assumptions: { normality: 'Met', homogeneity: 'Met' }, correctTest: 'Two-way ANOVA', explanation: "There are TWO independent variables (IVs): Dosage and Gender. We want to know the effect of Dosage, the effect of Gender, and if they interact (e.g., does High Dosage work better for Females?). This requires a Two-way (Factorial) ANOVA.", effectSize: { metric: 'Eta squared (η²)', value: 0.10, interpretation: 'Medium' } },
+            { id: 22, difficulty: 'Medium', clue: "Comparing frequencies between 2 categorical variables. Sample size is adequate.", description: "Association between Coffee Consumption (High/Low) and Sleep Quality (Good/Bad). N=200.", dataType: "Categorical", design: "Independent samples", assumptions: { expectedCounts: 'Met' }, correctTest: 'Chi-Square Test', explanation: "Both variables are categorical groupings. We have a large sample (N=200), ensuring expected counts are high. We use the Chi-Square Test of Independence to see if Coffee consumption is related to Sleep Quality.", effectSize: { metric: 'Cohen’s d', value: 0.3, interpretation: 'Small' } },
+            { id: 23, difficulty: 'Easy', clue: "Relationship between two continuous variables. Straight line.", description: "Height vs Weight in a healthy population.", dataType: "Continuous", design: "Correlation", assumptions: { linearity: 'Met', normality: 'Met' }, correctTest: 'Pearson Correlation', explanation: "Standard correlation question. Two continuous variables (Height, Weight) with a linear relationship and normal distribution. Pearson's r is the standard parametric test for this.", effectSize: null },
+            { id: 24, difficulty: 'Hard', clue: "Two independent groups with unequal variances.", description: "Test scores of students from a large city school vs a small rural school. Variances differ significantly.", dataType: "Continuous", design: "Independent observations", assumptions: { normality: 'Met', homogeneity: 'Violated' }, correctTest: 'Welch’s t-test', explanation: "Comparing two groups (City vs Rural). However, the spread of scores (Variance) is significantly different between the schools. Standard t-tests have a high error rate here, so Welch's t-test is required to adjust for unequal variances.", effectSize: { metric: 'Cohen’s d', value: 0.45, interpretation: 'Small' } },
+            { id: 25, difficulty: 'Boss', clue: "3+ groups, non-normal data.", description: "Pain relief scores (0-100) for 3 different drugs. Scores are heavily skewed.", dataType: "Continuous (Non-normal)", design: "Independent groups (≥3)", assumptions: { normality: 'Violated' }, correctTest: 'Kruskal-Wallis', explanation: "Comparing 3 groups (Drug A, B, C). Because pain scores are often skewed (not normal) or ordinal, the One-way ANOVA is invalid. We use the Kruskal-Wallis test to compare the mean ranks.", effectSize: { metric: 'Eta squared (η²)', value: 0.12, interpretation: 'Medium' } },
+            { id: 26, difficulty: 'Hard', clue: "Categorical, small sample.", description: "Survival (Yes/No) in a very small trial of a new treatment (N=12).", dataType: "Categorical", design: "Independent samples", assumptions: { expectedCounts: 'Violated' }, correctTest: 'Fisher’s Exact Test', explanation: "We are looking at an association between Treatment and Survival (Categorical). With N=12, the expected count in cells will likely be < 5. Chi-Square fails here; Fisher's Exact Test is necessary for small samples.", effectSize: null },
+            { id: 27, difficulty: 'Medium', clue: "Paired data, non-normal differences.", description: "Difference in reaction time before/after drinking energy drink. Skewed data.", dataType: "Continuous (Non-normal)", design: "Paired/Repeated (2 time points)", assumptions: { normality: 'Violated' }, correctTest: 'Wilcoxon Signed-Rank', explanation: "Paired design (Before/After). The differences in reaction time are skewed (not normal). We cannot use the Paired t-test. We must use the non-parametric Wilcoxon Signed-Rank test.", effectSize: { metric: 'Cohen’s d', value: 0.6, interpretation: 'Medium' } },
+            { id: 28, difficulty: 'Easy', clue: "Two independent groups, standard assumptions met.", description: "Comparing blood pressure of Men vs Women. Normal data, equal variances.", dataType: "Continuous", design: "Independent observations", assumptions: { normality: 'Met', homogeneity: 'Met' }, correctTest: 'Independent t-test', explanation: "The textbook scenario: Two independent groups (Men vs Women), continuous outcome (BP), Normal distribution, and Equal Variances. The Independent t-test is the correct parametric choice.", effectSize: { metric: 'Cohen’s d', value: 0.2, interpretation: 'Small' } },
+            { id: 29, difficulty: 'Boss', clue: "Repeated measures (3+), binary outcome.", description: "Success/Fail on a task across 3 trials for the same participants.", dataType: "Categorical (Binary)", design: "Same participants, ≥3 conditions", assumptions: {}, correctTest: 'Cochran’s Q', explanation: "Repeated measures on the same people, but the outcome is Binary (Success/Fail). Repeated Measures ANOVA requires continuous data. Cochran's Q is the extension of McNemar's test for 3+ repeated binary observations.", effectSize: null },
+            { id: 30, difficulty: 'Hard', clue: "Repeated measures (3+), sphericity violated.", description: "Measuring attention span at 10 min, 30 min, and 60 min. Correlations differ.", dataType: "Continuous", design: "Repeated measures (3+ time points)", assumptions: { normality: 'Met', sphericity: 'Violated' }, correctTest: 'Greenhouse-Geisser', explanation: "Tracking attention over 3 time points (Repeated Measures). The correlation between T1-T2 is different than T1-T3, violating Sphericity. We must use the Greenhouse-Geisser correction to adjust the degrees of freedom.", effectSize: { metric: 'Eta squared (η²)', value: 0.18, interpretation: 'Large' } }
+        ];
+
+        const allTests = Object.keys(knowledgeBase);
+
+        // --- STATE ---
+        let state = {
+            screen: 'start', lives: 3, score: 0, index: 0, initialTime: 300, timeLeft: 300, timerId: null,
+            revealedData: false, revealedAssumptions: false, processing: false,
+            tooltipsUnlocked: false, currentRunScenarios: []
+        };
+
+        const els = {};
+
+        function init() {
+            // 1. Map Elements
+            els.start = document.getElementById('start-screen');
+            els.tutorial = document.getElementById('tutorial-screen');
+            els.battle = document.getElementById('battle-screen');
+            els.effectSize = document.getElementById('effect-size-screen');
+            els.gameover = document.getElementById('gameover-screen');
+            els.victory = document.getElementById('victory-screen');
+            els.library = document.getElementById('library-screen');
+            els.lives = document.getElementById('lives-container');
+            els.timer = document.getElementById('timer-display');
+            els.timeText = document.getElementById('time-text');
+            els.score = document.getElementById('score-display');
+            els.questionNum = document.getElementById('question-num');
+            els.totalQ = document.getElementById('total-q');
+            els.warning = document.getElementById('time-warning');
+            els.scenarioDesc = document.getElementById('scenario-desc');
+            els.diffBadge = document.getElementById('difficulty-badge');
+            els.monsterIcon = document.getElementById('monster-icon');
+            els.spellButtons = document.getElementById('spell-buttons');
+            els.dataType = document.getElementById('data-type-val');
+            els.design = document.getElementById('design-val');
+            els.assumptions = document.getElementById('assumptions-info-revealed');
+            els.feedback = document.getElementById('feedback-overlay');
+            els.feedbackTitle = document.getElementById('feedback-title');
+            els.feedbackMsg = document.getElementById('feedback-msg');
+            els.feedbackBtns = document.getElementById('feedback-btn-container');
+            els.libraryContent = document.getElementById('library-content');
+            els.grimoire = document.getElementById('grimoire-content');
+            els.grimoireText = document.getElementById('grimoire-toggle-text');
+            els.dataHidden = document.getElementById('data-info-hidden');
+            els.dataRevealed = document.getElementById('data-info-revealed');
+            els.dataBtn = document.getElementById('scan-data-btn');
+            els.dataCard = document.getElementById('data-card');
+            els.assumpHidden = document.getElementById('assumptions-info-hidden');
+            els.assumpRevealed = document.getElementById('assumptions-info-revealed');
+            els.assumpBtn = document.getElementById('scan-assumptions-btn');
+            els.assumpCard = document.getElementById('assump-card');
+            els.clueContainer = document.getElementById('clue-container');
+            els.clueText = document.getElementById('clue-text');
+            els.clueBtn = document.getElementById('clue-btn');
+            els.gameCard = document.getElementById('game-card');
+            els.reactionOverlay = document.getElementById('reaction-overlay');
+            els.spellTooltip = document.getElementById('spell-tooltip-box');
+            els.tooltipLocked = document.getElementById('tooltip-locked-content');
+            els.tooltipActive = document.getElementById('tooltip-active-content');
+            els.unlockTooltipBtn = document.getElementById('unlock-tooltip-btn');
+            
+            // ADDED: Map new Reveal elements
+            els.revealBtn = document.getElementById('reveal-btn');
+            els.revealModal = document.getElementById('reveal-modal');
+            els.revealCorrectTest = document.getElementById('reveal-correct-test');
+            els.revealExplanation = document.getElementById('reveal-explanation');
+
+            // 2. Logic
+            lucide.createIcons();
+            populateLibrary();
+            renderSpellButtons();
+            populateGrimoire();
+        }
+
+        function populateGrimoire() {
+            const groups = {
+                "Comparing Two Groups": ['Independent t-test', 'Welch’s t-test', 'Mann-Whitney U Test', 'Paired t-test', 'Wilcoxon Signed-Rank'],
+                "Comparing 3+ Groups": ['One-way ANOVA', 'Kruskal-Wallis', 'Repeated Measures ANOVA', 'Greenhouse-Geisser', 'Two-way ANOVA'],
+                "Categorical Data": ['Chi-Square Test', 'Fisher’s Exact Test', 'McNemar Test', 'Cochran’s Q'],
+                "Correlation": ['Pearson Correlation', 'Spearman’s Rank Correlation']
+            };
+            let html = '';
+            for (const [groupName, tests] of Object.entries(groups)) {
+                html += `<div class="mb-4"><h4 class="font-bold text-yellow-400 border-b border-yellow-700/50 mb-2 sticky top-0 bg-slate-900/90 py-1">${groupName}</h4><div class="space-y-2">`;
+                tests.forEach(t => {
+                    const info = knowledgeBase[t];
+                    if (info) html += `<div class="text-xs bg-slate-800/50 p-2 rounded"><strong class="text-blue-300 block">${t}</strong><span class="text-slate-300">${info.details}</span></div>`;
+                });
+                html += `</div></div>`;
+            }
+            els.grimoire.innerHTML = html;
+        }
+
+        function populateLibrary() {
+            const groups = {
+                "Comparing Two Groups": ['Independent t-test', 'Welch’s t-test', 'Mann-Whitney U Test', 'Paired t-test', 'Wilcoxon Signed-Rank'],
+                "Comparing 3+ Groups": ['One-way ANOVA', 'Kruskal-Wallis', 'Repeated Measures ANOVA', 'Greenhouse-Geisser', 'Two-way ANOVA'],
+                "Categorical Data": ['Chi-Square Test', 'Fisher’s Exact Test', 'McNemar Test', 'Cochran’s Q'],
+                "Correlation": ['Pearson Correlation', 'Spearman’s Rank Correlation']
+            };
+            let html = '';
+            for (const [groupName, tests] of Object.entries(groups)) {
+                html += `<div class="bg-slate-800/50 p-6 rounded-lg border border-slate-700"><h2 class="text-xl font-bold text-blue-300 mb-4 border-b border-slate-700 pb-2">${groupName}</h2><div class="grid grid-cols-1 gap-6">`;
+                tests.forEach(t => {
+                    const info = knowledgeBase[t];
+                    if(info) html += `<div class="bg-slate-800 p-4 rounded border border-slate-700/50 hover:border-slate-500 transition-colors"><h3 class="text-lg font-bold text-white mb-2 flex items-center"><i data-lucide="zap" class="w-4 h-4 text-yellow-500 mr-2"></i> ${t}</h3><div class="space-y-3 text-sm"><p class="text-slate-300">${info.details}</p></div></div>`;
+                });
+                html += `</div></div>`;
+            }
+            els.libraryContent.innerHTML = html;
+            lucide.createIcons();
+        }
+
+        function renderSpellButtons() {
+            els.spellButtons.innerHTML = allTests.map(test => `
+                <button 
+                    onclick="handleAttack('${test}')" 
+                    onmouseenter="updateSpellTooltip('${test}')"
+                    onmouseleave="resetSpellTooltip()"
+                    class="btn-press bg-slate-700 hover:bg-purple-600 hover:text-white text-slate-200 text-xs sm:text-sm py-3 px-2 rounded transition-all duration-75 text-center border border-slate-600 shadow-sm">
+                    ${test}
+                </button>
+            `).join('');
+        }
+
+        // TOOLTIP LOGIC
+        function unlockTooltips() {
+            if (state.score < 20 && state.score > 0) { /* Optional: Prevent negative? Nah, let them go negative debt. */ }
+            state.score -= 20;
+            state.tooltipsUnlocked = true;
+            spawnFloatingText(els.unlockTooltipBtn.getBoundingClientRect().x, els.unlockTooltipBtn.getBoundingClientRect().y, "-20", "#ef4444");
+            
+            els.tooltipLocked.classList.add('hidden');
+            els.tooltipActive.classList.remove('hidden');
+            updateHUD();
+        }
+
+        function updateSpellTooltip(testName) {
+            if (!state.tooltipsUnlocked) return;
+            const info = knowledgeBase[testName];
+            if (info) {
+                els.tooltipActive.innerHTML = `<div class="animate-in fade-in zoom-in duration-200"><strong class="text-yellow-400 block mb-1">${testName}</strong><span class="text-white">${info.desc}</span></div>`;
+                els.spellTooltip.classList.remove('bg-slate-900/80', 'border-slate-700');
+                els.spellTooltip.classList.add('bg-purple-900/80', 'border-purple-500');
+            }
+        }
+
+        function resetSpellTooltip() {
+            if (!state.tooltipsUnlocked) return;
+            els.tooltipActive.innerHTML = `<span class="text-slate-500 italic text-sm">Hover over a spell to reveal its effect...</span>`;
+            els.spellTooltip.classList.add('bg-slate-900/80', 'border-slate-700');
+            els.spellTooltip.classList.remove('bg-purple-900/80', 'border-purple-500');
+        }
+
+        function showScreen(screenId) {
+            // Hide all screens
+            ['start-screen', 'tutorial-screen', 'battle-screen', 'effect-size-screen', 'gameover-screen', 'victory-screen', 'library-screen'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.classList.add('hidden');
+                    el.classList.remove('flex');
+                }
+            });
+            const target = document.getElementById(screenId);
+            target.classList.remove('hidden');
+            if(screenId === 'battle-screen' || screenId === 'tutorial-screen') target.classList.add('flex');
+        }
+
+        function prepareGame(minutes) {
+            const totalSeconds = minutes * 60;
+            // Shuffle scenarios and pick 10
+            const shuffled = [...scenarioPool].sort(() => 0.5 - Math.random());
+            const selectedScenarios = shuffled.slice(0, 10);
+
+            state = { 
+                screen: 'tutorial', 
+                lives: 3, 
+                score: 0, 
+                index: 0, 
+                initialTime: totalSeconds, 
+                timeLeft: totalSeconds, 
+                timerId: null, 
+                revealedData: false, 
+                revealedAssumptions: false, 
+                processing: false, 
+                tooltipsUnlocked: false,
+                currentRunScenarios: selectedScenarios
+            };
+            showScreen('tutorial-screen');
+            lucide.createIcons();
+        }
+
+        function startActualGame() {
+            state.screen = 'battle';
+            state.timerId = setInterval(gameLoop, 1000);
+            loadScenario();
+            updateHUD();
+            showScreen('battle-screen');
+            lucide.createIcons();
+        }
+
+        function resetGame() { if(state.timerId) clearInterval(state.timerId); returnToStart(); }
+        function returnToStart() { if(state.timerId) clearInterval(state.timerId); showScreen('start-screen'); }
+        function showLibrary() { showScreen('library-screen'); lucide.createIcons(); }
+
+        function gameLoop() {
+            state.timeLeft--;
+            if (state.timeLeft <= 0) gameOver("TIME EXPIRED");
+            updateHUD();
+        }
+
+        function updateHUD() {
+            const m = Math.floor(state.timeLeft / 60);
+            const s = (state.timeLeft % 60).toString().padStart(2, '0');
+            if(els.timeText) els.timeText.innerText = `${m}:${s}`;
+            
+            if (state.timeLeft < 60) { 
+                if(els.timer) {
+                    els.timer.classList.add('animate-pulse-red', 'bg-red-900/50', 'border-red-500', 'text-red-400');
+                    els.timer.classList.remove('bg-slate-900', 'border-slate-600', 'text-yellow-400');
+                }
+                if(els.warning) els.warning.classList.remove('hidden'); 
+            } else { 
+                if(els.timer) {
+                    els.timer.classList.remove('animate-pulse-red', 'bg-red-900/50', 'border-red-500', 'text-red-400');
+                    els.timer.classList.add('bg-slate-900', 'border-slate-600', 'text-yellow-400');
+                }
+                if(els.warning) els.warning.classList.add('hidden'); 
+            }
+            if(els.lives) els.lives.innerHTML = [1, 2, 3].map(i => `<i data-lucide="heart" class="w-8 h-8 ${i <= state.lives ? 'fill-red-500 text-red-500' : 'fill-slate-800 text-slate-700 animate-shake'}"></i>`).join('');
+            if(els.score) els.score.innerText = state.score;
+            if(els.questionNum) els.questionNum.innerText = state.index + 1;
+            if(els.totalQ) els.totalQ.innerText = state.currentRunScenarios.length;
+            lucide.createIcons();
+        }
+
+        function loadScenario() {
+            const sc = state.currentRunScenarios[state.index];
+            els.scenarioDesc.innerText = sc.description;
+            els.diffBadge.innerText = sc.difficulty;
+            els.diffBadge.className = sc.difficulty === 'Boss' ? 'text-red-400 font-bold' : 'text-white';
+            
+            state.revealedData = false;
+            state.revealedAssumptions = false;
+            state.tooltipsUnlocked = false; 
+            
+            // Clean up overlays
+            els.clueContainer.classList.add('hidden');
+            els.revealModal.classList.add('hidden');
+            els.reactionOverlay.classList.add('hidden');
+
+            els.clueBtn.disabled = false;
+            els.clueBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            
+            els.dataHidden.classList.remove('hidden');
+            els.dataRevealed.classList.add('hidden');
+            els.dataBtn.classList.remove('hidden');
+            els.assumpHidden.classList.remove('hidden');
+            els.assumpRevealed.classList.add('hidden');
+            els.assumpBtn.classList.remove('hidden');
+            
+            els.tooltipLocked.classList.remove('hidden');
+            els.tooltipActive.classList.add('hidden');
+            
+            els.monsterIcon.className = `w-10 h-10 ${sc.difficulty === 'Boss' ? 'text-red-500' : 'text-slate-400'}`;
+            els.gameCard.classList.remove('animate-shake');
+            els.dataCard.classList.remove('scanning-effect');
+            els.assumpCard.classList.remove('scanning-effect');
+        }
+
+        function toggleGrimoire() {
+            if(els.grimoire.classList.contains('hidden')) {
+                state.score -= 50; 
+                spawnFloatingText(els.grimoireText.getBoundingClientRect().x, els.grimoireText.getBoundingClientRect().y, "-50", "#ef4444");
+                updateHUD();
+            }
+            els.grimoire.classList.toggle('hidden');
+            els.grimoireText.innerText = els.grimoire.classList.contains('hidden') ? 'Open Grimoire (-50)' : 'Hide Grimoire';
+        }
+
+        function revealClue() {
+            const sc = state.currentRunScenarios[state.index];
+            state.score = Math.max(0, state.score - 25);
+            spawnFloatingText(els.clueBtn.getBoundingClientRect().x, els.clueBtn.getBoundingClientRect().y, "-25", "#ef4444");
+            els.clueText.innerText = sc.clue;
+            els.clueContainer.classList.remove('hidden');
+            els.clueBtn.disabled = true;
+            els.clueBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            updateHUD();
+        }
+        
+        // --- ADDED: Reveal Logic ---
+        function revealAnswer() {
+            state.score -= 100;
+            const rect = els.revealBtn.getBoundingClientRect();
+            spawnFloatingText(rect.x, rect.y, "-100", "#ef4444");
+            updateHUD();
+
+            const sc = state.currentRunScenarios[state.index];
+            els.revealCorrectTest.innerText = sc.correctTest;
+            els.revealExplanation.innerText = sc.explanation;
+            
+            els.revealModal.classList.remove('hidden');
+            els.revealModal.classList.add('flex');
+        }
+        
+        function finishReveal() {
+            closeReveal();
+            nextLevel();
+        }
+
+        function closeReveal() {
+            els.revealModal.classList.add('hidden');
+            els.revealModal.classList.remove('flex');
+        }
+        // --- End of Added Logic ---
+
+        function revealData() {
+            state.revealedData = true;
+            const sc = state.currentRunScenarios[state.index];
+            els.dataType.innerText = sc.dataType;
+            els.design.innerText = sc.design;
+            els.dataCard.classList.add('scanning-effect');
+            setTimeout(() => { els.dataHidden.classList.add('hidden'); els.dataRevealed.classList.remove('hidden'); els.dataBtn.classList.add('hidden'); }, 500);
+        }
+
+        function revealAssumptions() {
+            state.revealedAssumptions = true;
+            const sc = state.currentRunScenarios[state.index];
+            const entries = Object.entries(sc.assumptions);
+            if (entries.length === 0) { els.assumptions.innerHTML = `<span class="text-slate-500">No specific assumption check required.</span>`; } else { els.assumptions.innerHTML = entries.map(([k, v]) => `<div class="flex justify-between"><span class="capitalize text-slate-500">${k}:</span><span class="${v === 'Met' ? 'text-green-400' : 'text-red-400 font-bold'}">${v}</span></div>`).join(''); }
+            els.assumpCard.classList.add('scanning-effect');
+            setTimeout(() => { els.assumpHidden.classList.add('hidden'); els.assumpRevealed.classList.remove('hidden'); els.assumpBtn.classList.add('hidden'); }, 500);
+        }
+
+        function handleAttack(testName) {
+            if (state.processing) return;
+            state.processing = true;
+            const sc = state.currentRunScenarios[state.index];
+            if (testName === sc.correctTest) {
+                if (sc.effectSize) { showEffectSizeScreen(sc); } else { showReaction('success', `Correct! ${sc.explanation}`); }
+            } else {
+                state.lives--;
+                updateHUD();
+                els.gameCard.classList.remove('animate-shake');
+                void els.gameCard.offsetWidth; 
+                els.gameCard.classList.add('animate-shake');
+                showReaction('fail', "Wrong Test! Life lost.");
+                if (state.lives <= 0) { setTimeout(() => gameOver("LIVES DEPLETED"), 1500); } else { state.processing = false; }
+            }
+        }
+
+        function showEffectSizeScreen(sc) {
+            showScreen('effect-size-screen');
+            document.getElementById('es-metric').innerText = sc.effectSize.metric;
+            document.getElementById('es-value').innerText = sc.effectSize.value;
+        }
+
+        function guessEffectSize(guess) {
+            const sc = state.currentRunScenarios[state.index];
+            const correct = sc.effectSize.interpretation === guess;
+            if (correct) { 
+                showScreen('battle-screen'); 
+                // APPEND EXPLANATION HERE
+                showReaction('success-bonus', `CRITICAL HIT! Perfect interpretation.<br><br><span class="text-sm text-slate-300">${sc.explanation}</span>`); 
+            } else { 
+                showScreen('battle-screen'); 
+                // APPEND EXPLANATION HERE
+                showReaction('fail-bonus', `Weak hit... It was actually ${sc.effectSize.interpretation}.<br><br><span class="text-sm text-slate-300">${sc.explanation}</span>`); 
+            }
+        }
+
+        function spawnFloatingText(x, y, text, color) {
+            const el = document.createElement('div');
+            el.innerText = text;
+            el.style.left = `${x}px`;
+            el.style.top = `${y}px`;
+            el.style.color = color;
+            el.className = 'floating-text text-xl';
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 1000);
+        }
+
+        function showReaction(type, msg) {
+            els.reactionOverlay.classList.remove('hidden');
+            let content = '';
+            
+            // Fixed Button Logic
+            let buttonHtml = '';
+            if (type === 'success') {
+                 buttonHtml = `<button onclick="window.finishTurn(true, false)" class="bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition hover:scale-105">Continue</button>`;
+            } else if (type === 'success-bonus') {
+                 buttonHtml = `<button onclick="window.finishTurn(true, true)" class="bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition hover:scale-105">Continue</button>`;
+            } else if (type === 'fail-bonus') {
+                 buttonHtml = `<button onclick="window.finishTurn(true, false)" class="bg-slate-600 hover:bg-slate-500 text-white font-bold py-3 px-8 rounded-full">Continue</button>`;
+            } else {
+                 buttonHtml = `<button onclick="closeReaction()" class="bg-red-600 hover:bg-red-500 text-white font-bold py-3 px-8 rounded-full shadow-lg">Try Again</button>`;
+            }
+
+            // ADDED: Scrollable container for the text message
+            if (type === 'success' || type === 'success-bonus') {
+                const points = type === 'success-bonus' ? "+50" : "+100";
+                const scoreRect = els.score.getBoundingClientRect();
+                spawnFloatingText(scoreRect.x, scoreRect.y, points, "#4ade80");
+                content = `<div class="animate-pop flex flex-col items-center w-full max-w-lg">
+                    <div class="text-6xl mb-4 relative">🧙‍♂️<div class="absolute -bottom-2 -right-2 text-4xl">👍</div></div>
+                    <h2 class="text-4xl font-bold text-green-400 mb-4">FANTASTIC!</h2>
+                    <div class="text-slate-200 text-center mb-6 w-full max-h-[40vh] overflow-y-auto force-scroll p-2 bg-slate-800/50 rounded border border-slate-700">
+                        ${msg}
+                    </div>
+                    ${buttonHtml}
+                </div>`;
+                triggerConfetti();
+            } else if (type === 'fail') {
+                 content = `<div class="animate-pop flex flex-col items-center w-full max-w-lg">
+                    <div class="text-6xl mb-4 relative animate-glitch">🧙‍♂️<div class="absolute -bottom-2 -right-2 text-4xl">🤦‍♂️</div></div>
+                    <h2 class="text-4xl font-bold text-red-500 mb-4 animate-glitch">MISS!</h2>
+                    <div class="text-slate-200 text-center mb-6 w-full">
+                        ${msg}
+                    </div>
+                    ${buttonHtml}
+                </div>`;
+            } else if (type === 'fail-bonus') {
+                 content = `<div class="animate-pop flex flex-col items-center w-full max-w-lg">
+                    <div class="text-6xl mb-4">📉</div>
+                    <h2 class="text-3xl font-bold text-yellow-400 mb-4">ALMOST...</h2>
+                    <div class="text-slate-200 text-center mb-6 w-full max-h-[40vh] overflow-y-auto force-scroll p-2 bg-slate-800/50 rounded border border-slate-700">
+                        ${msg}
+                    </div>
+                    ${buttonHtml}
+                </div>`;
+            }
+            els.reactionOverlay.innerHTML = content;
+        }
+
+        function closeReaction() { els.reactionOverlay.classList.add('hidden'); }
+        
+        // Define function explicitly
+        window.finishTurn = function(success, bonus) { 
+            els.reactionOverlay.classList.add('hidden'); 
+            if (success) { state.score += (100 + (bonus ? 50 : 0)); updateHUD(); nextLevel(); } 
+        }
+
+        function triggerConfetti() {
+            const colors = ['#60A5FA', '#34D399', '#FBBF24', '#F87171', '#A78BFA'];
+            for (let i = 0; i < 50; i++) {
+                const conf = document.createElement('div');
+                conf.classList.add('confetti-piece');
+                conf.style.left = Math.random() * 100 + 'vw';
+                conf.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                conf.style.animation = `fall ${Math.random() * 3 + 2}s linear forwards`;
+                document.body.appendChild(conf);
+                setTimeout(() => conf.remove(), 5000);
+            }
+        }
+
+        function nextLevel() {
+            state.index++;
+            if (state.index >= state.currentRunScenarios.length) { victory(); } else { 
+                loadScenario(); 
+                updateHUD(); 
+                state.processing = false; 
+                showScreen('battle-screen');
+            }
+        }
+
+        function gameOver(reason) {
+            clearInterval(state.timerId);
+            document.getElementById('gameover-reason').innerText = reason;
+            document.getElementById('gameover-q').innerText = state.index + 1;
+            showScreen('gameover-screen');
+            lucide.createIcons();
+        }
+
+        function victory() {
+            clearInterval(state.timerId);
+            state.processing = false;
+            const taken = state.initialTime - state.timeLeft;
+            const mTaken = Math.floor(taken / 60);
+            const sTaken = (taken % 60).toString().padStart(2, '0');
+            const msgs = ["Result Significant at p < .0001! You rejected the null hypothesis with extreme prejudice.", "Your statistical power level is over 9000! A truly significant performance.", "You are the outlier we've been looking for. Perfect distribution of skill.", "Effect Size: LEGENDARY. You've explained 100% of the variance.", "No Type I or Type II errors detected. Just pure accuracy."];
+            const msg = msgs[Math.floor(Math.random() * msgs.length)];
+            document.getElementById('final-score').innerText = state.score;
+            document.getElementById('final-time-taken').innerText = `${mTaken}:${sTaken}`;
+            document.getElementById('victory-msg').innerText = msg;
+            showScreen('victory-screen');
+            lucide.createIcons();
+        }
+
+        // Initialize AFTER DOM is parsed
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
