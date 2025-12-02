@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>R-Studio: Syntax Overdrive</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+        
+        :root {
+            --bg-dark: #0f172a; /* Slate 900 */
+            --neon-blue: #3b82f6; /* R Blue */
+            --neon-gold: #fbbf24;
+            --neon-green: #10b981;
+            --neon-red: #ef4444;
+            --neon-purple: #8b5cf6;
+        }
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background-color: #020617; /* Darker Slate */
+            color: #f1f5f9;
+            overflow-x: hidden;
+        }
+
+        /* --- FORCE SCROLLBAR VISIBILITY (High Contrast) --- */
+        .force-scroll::-webkit-scrollbar {
+            width: 14px;
+        }
+
+        .force-scroll::-webkit-scrollbar-track {
+            background: #0f172a;
+            border-left: 1px solid #334155;
+        }
+
+        .force-scroll::-webkit-scrollbar-thumb {
+            background-color: #64748b;
+            border-radius: 6px;
+            border: 3px solid #0f172a;
+        }
+
+        .force-scroll::-webkit-scrollbar-thumb:hover {
+            background-color: #94a3b8;
+        }
+
+        /* Firefox */
+        .force-scroll {
+            scrollbar-width: auto;
+            scrollbar-color: #64748b #0f172a;
+        }
+
+        /* --- RPG ANIMATIONS --- */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+        .animate-shake { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+
+        @keyframes popIn {
+            0% { transform: scale(0.9) translateY(10px); opacity: 0; }
+            100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+        .animate-pop { animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+
+        @keyframes glitch {
+            0% { text-shadow: 2px 2px var(--neon-red), -2px -2px var(--neon-blue); }
+            25% { text-shadow: -2px 2px var(--neon-red), 2px -2px var(--neon-blue); }
+            50% { text-shadow: 2px -2px var(--neon-red), -2px 2px var(--neon-blue); }
+            100% { text-shadow: 0 0 transparent; }
+        }
+        .animate-glitch { animation: glitch 0.3s cubic-bezier(.25, .46, .45, .94) both; }
+
+        @keyframes scan-sweep {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        .scanning-effect {
+            background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(59, 130, 246, 0.1) 50%, rgba(255,255,255,0) 100%);
+            background-size: 200% 100%;
+            animation: scan-sweep 2s linear infinite;
+        }
+
+        /* Visualization Canvas */
+        #viz-canvas {
+            width: 100%;
+            height: 120px;
+            background: rgba(15, 23, 42, 0.5);
+            border-radius: 4px;
+        }
+        
+        /* Confetti */
+        .confetti-piece {
+            position: absolute; width: 8px; height: 8px; top: 0; pointer-events: none; z-index: 60;
+        }
+        @keyframes fall {
+            to { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+        }
+        
+        /* Formatted Logic Box */
+        .logic-step {
+            margin-bottom: 8px;
+            padding-left: 12px;
+            border-left: 3px solid #3b82f6; /* R Blue */
+            line-height: 1.4;
+            color: #e2e8f0;
+        }
+        .logic-conclusion {
+            margin-top: 16px;
+            margin-bottom: 16px;
+            padding: 12px;
+            background: rgba(59, 130, 246, 0.15);
+            border-radius: 6px;
+            border: 1px solid #3b82f6;
+            font-weight: bold;
+            color: #60a5fa;
+            text-align: center;
+        }
+        .logic-why {
+            margin-top: 8px;
+            padding-left: 0;
+            color: #94a3b8; /* Slate 400 */
+            font-style: italic;
+            font-size: 0.9em;
+            border-left: none;
+            margin-bottom: 4px;
+        }
+        .example-box {
+            margin-top: 12px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+            border-left: 3px solid #fbbf24; /* Gold */
+            font-family: monospace;
+            font-size: 0.85em;
+            color: #fbbf24;
+        }
+        
+        .btn-neon {
+            transition: all 0.15s ease;
+        }
+        .btn-neon:active { transform: translateY(2px); }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center p-4 relative">
+
+    <!-- APP CONTAINER -->
+    <div id="app" class="max-w-5xl w-full z-10 relative flex flex-col gap-4">
+
+        <!-- --- SCREEN: START --- -->
+        <div id="start-screen" class="text-center space-y-8 py-10 animate-in fade-in zoom-in duration-500">
+            <div class="relative inline-block">
+                <div class="absolute -inset-1 bg-gradient-to-r from-blue-700 to-cyan-500 rounded-lg blur opacity-50 animate-pulse"></div>
+                <h1 class="relative text-5xl md:text-6xl font-bold text-white tracking-tighter p-4 bg-slate-900 rounded-lg">
+                    R-STUDIO: SYNTAX OVERDRIVE
+                </h1>
+            </div>
+            <p class="text-xl text-blue-200 tracking-widest uppercase font-bold">Master the Object System</p>
+            
+            <div class="bg-slate-900/90 border-2 border-slate-700 p-8 rounded-xl shadow-2xl max-w-2xl mx-auto backdrop-blur-md">
+                <p class="mb-6 text-lg text-slate-300">
+                    Identify the correct <strong>R Data Structure</strong> or <strong>Concept</strong> required to process the data stream.
+                </p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                    <button onclick="prepareGame(15)" class="btn-neon bg-green-900/30 border-b-4 border-green-600 text-green-400 hover:bg-green-800 font-bold py-4 rounded">
+                        <div>JUNIOR ANALYST</div><div class="text-xs opacity-75">15 Mins</div>
+                    </button>
+                    <button onclick="prepareGame(10)" class="btn-neon bg-blue-900/30 border-b-4 border-blue-600 text-blue-400 hover:bg-blue-800 font-bold py-4 rounded">
+                        <div>DATA SCIENTIST</div><div class="text-xs opacity-75">10 Mins</div>
+                    </button>
+                    <button onclick="prepareGame(5)" class="btn-neon bg-purple-900/30 border-b-4 border-purple-600 text-purple-400 hover:bg-purple-800 font-bold py-4 rounded">
+                        <div>CORE DEVELOPER</div><div class="text-xs opacity-75">5 Mins</div>
+                    </button>
+                </div>
+                
+                <button onclick="showLibrary()" class="text-slate-500 hover:text-white underline text-sm flex items-center justify-center w-full transition-colors">
+                    <i data-lucide="book-open" class="w-4 h-4 mr-2"></i> Access CRAN Documentation (Reference)
+                </button>
+            </div>
+        </div>
+
+        <!-- --- SCREEN: BATTLE (HUD + GAME) --- -->
+        <div id="battle-screen" class="hidden flex-col gap-4 w-full max-w-4xl mx-auto">
+            
+            <!-- HUD -->
+            <div class="flex flex-wrap justify-between items-center bg-slate-900/90 border-b-2 border-slate-700 p-3 sticky top-0 z-30 backdrop-blur-md rounded-b-xl shadow-lg">
+                <div class="flex items-center gap-2 w-1/3" id="lives-container">
+                    <!-- Hearts injected here -->
+                </div>
+                
+                <div id="timer-display" class="font-mono text-2xl text-blue-400 border border-blue-900/50 bg-slate-950 px-4 py-1 rounded shadow-[0_0_10px_rgba(59,130,246,0.3)]">
+                    00:00
+                </div>
+                
+                <div class="w-1/3 flex flex-col items-end">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-xs text-slate-400 uppercase font-bold tracking-widest">Progress</span>
+                        <span class="text-sm font-bold text-white bg-slate-800 px-2 py-0.5 rounded border border-slate-600">
+                            <span id="hud-q-current">1</span> / 10
+                        </span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs text-slate-500 uppercase tracking-widest">Score</span>
+                        <span class="text-xl font-bold text-green-400" id="score-display">0</span>
+                    </div>
+                </div>
+                
+                <div id="time-warning" class="hidden absolute top-full left-0 w-full text-center bg-red-900/90 text-red-200 text-xs font-bold py-1 animate-pulse">
+                    RUNTIME ERROR IMMINENT
+                </div>
+            </div>
+
+            <!-- MAIN CARD AREA (TALL) -->
+            <div id="game-card" class="bg-slate-800 border-2 border-slate-600 p-6 rounded-xl relative overflow-hidden min-h-[450px] md:min-h-[550px] flex flex-col transition-all duration-300 shadow-2xl">
+                <div class="flex justify-between items-start mb-4">
+                    <span class="text-xs font-mono text-slate-500">> source('scenario.R')</span> 
+                    <span id="diff-badge" class="text-xs font-bold text-purple-400 border border-purple-500/50 px-2 py-1 rounded">HARD</span>
+                </div>
+
+                <!-- Scenario Text -->
+                <div class="flex-grow flex flex-col items-center justify-center text-center mb-6 z-10 relative">
+                    <div class="w-20 h-20 bg-slate-900 rounded-lg flex items-center justify-center mb-6 border border-slate-700 shadow-inner">
+                        <span class="text-4xl font-bold text-blue-500">R</span>
+                    </div>
+                    <h2 class="text-xl md:text-2xl font-bold text-white mb-4" id="scenario-title">Scenario Title</h2>
+                    <p class="text-slate-300 text-base md:text-lg max-w-lg leading-relaxed font-medium" id="scenario-desc">
+                        Scenario description...
+                    </p>
+                </div>
+
+                <!-- Visualization Canvas -->
+                <div class="w-full h-32 mb-4 rounded border border-slate-700 bg-slate-900 relative overflow-hidden">
+                    <canvas id="viz-canvas"></canvas>
+                    <div class="absolute top-2 right-2 text-xs text-slate-600 font-mono">Plot Output</div>
+                </div>
+
+                <!-- Reaction Overlay -->
+                <div id="reaction-overlay" class="hidden absolute inset-0 bg-slate-950/95 z-40 flex flex-col items-center justify-center p-4">
+                    <!-- Injected Content -->
+                </div>
+            </div>
+
+            <!-- INTERACTION PANEL -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                
+                <!-- Left: Tools -->
+                <div class="lg:col-span-1 space-y-2">
+                    <!-- Deep Logic Scan (NOW INSPECT DEFINITIONS) -->
+                    <button onclick="revealDeepLogic()" id="btn-deep-logic" class="w-full btn-neon flex items-center justify-between bg-slate-800 hover:bg-slate-700 border-b-4 border-slate-600 active:border-b-0 active:translate-y-1 text-slate-300 px-4 py-3 rounded group">
+                        <span class="flex items-center"><i data-lucide="book-open-check" class="w-4 h-4 mr-2 text-purple-400"></i> Inspect Definitions</span>
+                        <span class="text-xs bg-slate-900 px-2 py-1 rounded text-purple-300 group-hover:bg-purple-900 transition-colors">-20 Pts</span>
+                    </button>
+                    
+                    <!-- Hint -->
+                    <button onclick="revealHint()" id="btn-hint" class="w-full btn-neon flex items-center justify-between bg-slate-800 hover:bg-slate-700 border-b-4 border-slate-600 active:border-b-0 active:translate-y-1 text-slate-300 px-4 py-3 rounded group">
+                        <span class="flex items-center"><i data-lucide="help-circle" class="w-4 h-4 mr-2 text-yellow-400"></i> consult(Help)</span>
+                        <span class="text-xs bg-slate-900 px-2 py-1 rounded text-yellow-300 group-hover:bg-yellow-900 transition-colors">-25 Pts</span>
+                    </button>
+
+                    <!-- Surrender -->
+                    <button onclick="revealAnswer()" id="btn-reveal" class="w-full btn-neon flex items-center justify-between bg-slate-800 hover:bg-slate-700 border-b-4 border-slate-600 active:border-b-0 active:translate-y-1 text-slate-300 px-4 py-3 rounded group">
+                        <span class="flex items-center"><i data-lucide="alert-octagon" class="w-4 h-4 mr-2 text-red-400"></i> stop() / Surrender</span>
+                        <span class="text-xs bg-slate-900 px-2 py-1 rounded text-red-300 group-hover:bg-red-900 transition-colors">-100 Pts</span>
+                    </button>
+
+                    <!-- Grimoire Toggle -->
+                    <button onclick="toggleGrimoire()" class="w-full btn-neon flex items-center justify-center bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-400 text-xs py-2 rounded mt-2">
+                        <i data-lucide="book" class="w-3 h-3 mr-2"></i> <span id="grimoire-status">Reference Card (-50)</span>
+                    </button>
+                </div>
+
+                <!-- Right: Selection Grid -->
+                <div class="lg:col-span-2 bg-slate-800 border border-slate-600 p-4 rounded-xl relative shadow-lg">
+                    <div class="absolute top-0 right-0 bg-blue-700 text-xs font-bold px-3 py-1 rounded-bl text-white">SELECT OPTION</div>
+                    
+                    <!-- Spell Tooltip -->
+                    <div id="spell-tooltip" class="mb-3 min-h-[3rem] flex items-center justify-center text-center text-xs text-blue-200 italic bg-slate-900/50 rounded border border-blue-900/30 p-2">
+                        <div id="tooltip-locked" class="flex items-center gap-2">
+                            <i data-lucide="lock" class="w-3 h-3"></i> 
+                            <span>Properties Hidden. <button onclick="unlockTooltips()" class="underline text-blue-400 hover:text-blue-300 font-bold">str() / Identify (-20)</button></span>
+                        </div>
+                        <div id="tooltip-active" class="hidden w-full">Hover to inspect object properties...</div>
+                    </div>
+
+                    <div id="options-grid" class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <!-- Buttons injected JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Information Panels (Hidden by default) -->
+            <div id="panel-deep-logic" class="hidden bg-purple-900/20 border-l-4 border-purple-500 p-4 rounded animate-in slide-in-from-left">
+                <h4 class="text-purple-400 font-bold text-sm mb-1 font-mono">AVAILABLE DEFINITIONS:</h4>
+                <div id="deep-logic-text" class="text-sm text-slate-300 space-y-1 font-mono">...</div>
+            </div>
+
+            <div id="panel-hint" class="hidden bg-yellow-900/20 border-l-4 border-yellow-500 p-4 rounded animate-in slide-in-from-left">
+                <h4 class="text-yellow-400 font-bold text-sm mb-1 font-mono">DOCUMENTATION SNIPPET:</h4>
+                <p id="hint-text" class="text-sm text-slate-300 italic">...</p>
+            </div>
+
+            <!-- Grimoire Overlay (In-line) -->
+            <div id="grimoire-container" class="hidden bg-slate-900 border border-slate-500 p-4 rounded mt-4 h-64 overflow-y-auto text-sm force-scroll">
+                <!-- Content injected -->
+            </div>
+
+        </div>
+
+        <!-- --- REVEAL MODAL (Expanded Height + Scroll + Formatted Logic) --- -->
+        <div id="reveal-modal" class="hidden fixed inset-0 bg-slate-950/95 z-50 flex items-center justify-center p-4">
+            <div class="bg-slate-900 border-2 border-red-600 rounded-lg p-6 max-w-lg w-full shadow-2xl relative animate-pop flex flex-col max-h-[85vh] min-h-[60vh]">
+                <button onclick="closeReveal()" class="absolute top-2 right-2 text-slate-400 hover:text-white"><i data-lucide="x" class="w-6 h-6"></i></button>
+                
+                <div class="flex-shrink-0 mb-4 text-center">
+                    <h2 class="text-3xl font-bold text-red-500 flex items-center justify-center gap-3 border-b border-slate-800 pb-4">
+                        <i data-lucide="alert-octagon" class="w-8 h-8"></i> EXECUTION HALTED
+                    </h2>
+                </div>
+                
+                <div class="flex-1 min-h-0 overflow-y-auto force-scroll space-y-6 pr-2">
+                    <div class="bg-slate-800 p-4 rounded border border-slate-700">
+                        <p class="text-xs text-slate-500 uppercase tracking-widest mb-2 font-mono">Correct Object/Concept:</p>
+                        <p id="reveal-correct-dist" class="text-2xl font-bold text-white font-mono text-center"></p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-500 uppercase tracking-widest mb-2 font-mono">Traceback / Logic:</p>
+                        <!-- This div will receive the formatted HTML -->
+                        <div id="reveal-explanation" class="text-blue-200 text-sm leading-relaxed font-mono"></div>
+                    </div>
+                </div>
+                
+                <div class="flex-shrink-0 mt-6">
+                    <button onclick="finishReveal()" class="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-4 rounded border border-slate-600 shadow-lg uppercase tracking-widest">Acknowledge & Continue</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- --- SCREEN: GAME OVER --- -->
+        <div id="gameover-screen" class="hidden flex-col items-center justify-center min-h-[60vh] space-y-6 text-center animate-in zoom-in">
+            <div class="text-red-500 font-mono text-6xl">FATAL ERROR</div>
+            <p class="text-xl text-slate-400 font-mono" id="gameover-reason">Session Aborted.</p>
+            <div class="flex gap-4">
+                <button onclick="resetGame()" class="btn-neon bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded">restart()</button>
+                <button onclick="showLibrary()" class="btn-neon bg-slate-700 hover:bg-slate-600 text-white py-3 px-6 rounded">help()</button>
+            </div>
+        </div>
+
+        <!-- --- SCREEN: VICTORY --- -->
+        <div id="victory-screen" class="hidden flex-col items-center justify-center min-h-[60vh] space-y-6 text-center animate-in zoom-in">
+            <div class="text-6xl animate-bounce">📦</div>
+            <h1 class="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300">
+                PACKAGE COMPILED
+            </h1>
+            <p id="victory-msg" class="text-lg text-slate-300 max-w-md font-mono">0 Errors, 0 Warnings.</p>
+            
+            <div class="grid grid-cols-2 gap-4 w-full max-w-md">
+                <div class="bg-slate-800 p-4 rounded border border-slate-700">
+                    <div class="text-slate-500 text-xs uppercase">Score</div>
+                    <div class="text-3xl font-bold text-white" id="final-score">0</div>
+                </div>
+                <div class="bg-slate-800 p-4 rounded border border-slate-700">
+                    <div class="text-slate-500 text-xs uppercase">Runtime</div>
+                    <div class="text-3xl font-bold text-green-400" id="final-time">00:00</div>
+                </div>
+            </div>
+
+            <button onclick="resetGame()" class="btn-neon bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-10 rounded shadow-[0_0_15px_rgba(37,99,235,0.5)]">
+                NEW SESSION
+            </button>
+        </div>
+
+        <!-- --- SCREEN: LIBRARY --- -->
+        <div id="library-screen" class="hidden w-full max-w-4xl pt-4">
+            <div class="flex items-center gap-4 mb-6 border-b border-slate-700 pb-4">
+                <button onclick="returnToStart()" class="p-2 bg-slate-800 rounded hover:bg-slate-700 text-white"><i data-lucide="arrow-left" class="w-6 h-6"></i></button>
+                <h1 class="text-2xl font-bold text-white font-mono">package:base (Reference)</h1>
+            </div>
+            <div id="library-content" class="grid grid-cols-1 md:grid-cols-2 gap-4 pb-10">
+                <!-- Injected -->
+            </div>
+        </div>
+
+    </div>
+
+    <!-- LOGIC -->
+    <script>
+        // --- DATA: R Concepts ---
+        const r_concepts = [
+            { id: 'vector', name: "Atomic Vector", desc: "1D structure. Homogeneous (all same type). Foundational unit.", tooltip: "logical, integer, double, character. Created with c()." },
+            { id: 'dataframe', name: "Data Frame", desc: "2D Table. Heterogeneous (columns can be diff types).", tooltip: "Used for datasets. List of vectors of equal length. read.table() creates this." },
+            { id: 'list', name: "List", desc: "Recursive. Heterogeneous. Can contain ANY object type.", tooltip: "Can hold vectors, data frames, or other lists. Returned by many statistical functions." },
+            { id: 'matrix', name: "Matrix", desc: "2D structure. Homogeneous (all same type).", tooltip: "Math heavy. Uses matrix algebra operators (%*%)." },
+            { id: 'factor', name: "Factor", desc: "Categorical data. Integer vector with levels (labels).", tooltip: "Used for grouping/modeling. Levels are fixed." },
+            { id: 'apply', name: "Apply Family", desc: "Vectorized iteration. Apply function over margins/elements.", tooltip: "lapply, sapply, apply. Faster/cleaner than for-loops." },
+            { id: 'io', name: "I/O Connection", desc: "Reading/Writing data to files/URLs.", tooltip: "read.csv, saveRDS, scan, write.table." },
+            { id: 'control', name: "Control Flow", desc: "Logic structures. if, else, for, while.", tooltip: "Directs execution path. Looping and conditionals." },
+            
+            // Extra definitions
+            { id: 'read.csv', name: "read.csv", desc: "Reads comma-separated value files into a data frame.", tooltip: "Returns data frame." },
+            { id: 'saveRDS', name: "saveRDS", desc: "Saves a single R object to a binary file.", tooltip: "Serialization." },
+            { id: 'read.table', name: "read.table", desc: "Reads general tabular data into a data frame.", tooltip: "Base import function." },
+            { id: 'source', name: "source", desc: "Executes R code from a file or connection.", tooltip: "Run code." },
+            { id: 'scan', name: "scan", desc: "Read data values sequentially from a file.", tooltip: "Low-level input." },
+            { id: 'readRDS', name: "readRDS", desc: "Restores an R object from a binary file.", tooltip: "Restore object." },
+            { id: 'write.table', name: "write.table", desc: "Prints a data frame to a file.", tooltip: "Exporting." },
+            { id: 'load', name: "load", desc: "Reloads datasets written with save().", tooltip: "Restore session." },
+            { id: 'Connection', name: "Connection", desc: "An interface to files, URLs, or pipes.", tooltip: "Abstract I/O link." },
+            { id: 'download.file', name: "download.file", desc: "Downloads a file from the Internet.", tooltip: "Web access." },
+            { id: 'for loop', name: "for loop", desc: "Repeats code for each element in a vector/list.", tooltip: "Iteration." },
+            { id: 'if/else', name: "if/else", desc: "Conditional execution of code blocks.", tooltip: "Decision." },
+            { id: 'while loop', name: "while loop", desc: "Repeats code while a condition is TRUE.", tooltip: "Conditional loop." },
+            { id: 'next', name: "next", desc: "Halts processing the current iteration and advances.", tooltip: "Skip." },
+            { id: 'break', name: "break", desc: "Exits the innermost loop immediately.", tooltip: "Exit." },
+            { id: 'repeat', name: "repeat", desc: "Initiates an infinite loop.", tooltip: "Requires break." },
+            { id: 'switch', name: "switch", desc: "Selects a value from a list based on an expression.", tooltip: "Case selection." },
+            { id: 'ifelse', name: "ifelse", desc: "Vectorized conditional element selection.", tooltip: "Vector safe if." },
+            { id: '<<-', name: "<<-", desc: "Assigns a value to a name in a parent environment.", tooltip: "Super assignment." },
+            { id: 'function definition', name: "function()", desc: "Keyword to define a new function.", tooltip: "Define logic." },
+            { id: 'return()', name: "return()", desc: "Stops execution and returns a value.", tooltip: "Output." },
+            { id: '... argument', name: "...", desc: "Allows a function to accept variable arguments.", tooltip: "Pass-through." },
+            { id: 'argument defaults', name: "Defaults", desc: "Values used if an argument is omitted.", tooltip: "Fallback." },
+            { id: 'anonymous function', name: "Anonymous", desc: "A function defined without being assigned a name.", tooltip: "Lambda." },
+            { id: 'Enclosing Environment', name: "Enclosing Env", desc: "The environment where the function was created.", tooltip: "Scope." },
+            { id: 'Implicit Return', name: "Implicit Return", desc: "The value of the last evaluated expression.", tooltip: "Auto return." },
+            { id: 'match.call', name: "match.call", desc: "Returns a call in which all arguments are specified.", tooltip: "Arg handling." },
+            { id: 'S3', name: "S3", desc: "Object-oriented system using generic functions.", tooltip: "OOP system." },
+            { id: 'debug', name: "debug", desc: "Flags a function for debugging execution.", tooltip: "Troubleshooting." },
+            { id: 'lapply', name: "lapply", desc: "Apply function over a list, returning a list.", tooltip: "List iteration." },
+            { id: 'sapply', name: "sapply", desc: "Apply over list and attempt to simplify result.", tooltip: "Simple iteration." },
+            { id: 'apply', name: "apply", desc: "Apply function over array margins.", tooltip: "Matrix iteration." },
+            { id: 'tapply', name: "tapply", desc: "Apply function over a ragged array (groups).", tooltip: "Grouped iteration." },
+            { id: 'mapply', name: "mapply", desc: "Apply function to multiple list/vector arguments.", tooltip: "Multiple args." },
+            { id: 'vapply', name: "vapply", desc: "Apply function with a pre-specified return value.", tooltip: "Type safe." },
+            { id: 'parallel', name: "parallel", desc: "Package for parallel execution.", tooltip: "Multi-core." },
+            { id: 'rapply', name: "rapply", desc: "Recursively apply a function to a list.", tooltip: "Deep iteration." },
+            { id: 'eapply', name: "eapply", desc: "Apply a function to values in an environment.", tooltip: "Env iteration." },
+            { id: 'No (Warning)', name: "No", desc: "Standard 'if' only accepts length-1 logicals.", tooltip: "Logical error." },
+            { id: 'Array', name: "Array", desc: "N-dimensional generalization of a matrix.", tooltip: "3D+ grids." }
+        ];
+
+        const categories = {
+            'Data Structures': ['Atomic Vector', 'List', 'Matrix', 'Data Frame', 'Factor', 'Array'],
+            'I/O': ['read.table', 'read.csv', 'scan', 'saveRDS', 'readRDS', 'source', 'write.table'],
+            'Control Flow': ['if/else', 'for loop', 'while loop', 'repeat', 'next', 'break', 'switch'],
+            'Functions': ['function definition', 'return()', 'argument defaults', '... argument', 'anonymous function'],
+            'Apply Family': ['lapply', 'sapply', 'apply', 'tapply', 'mapply', 'vapply']
+        };
+
+        // --- 50 QUESTIONS WITH EXAMPLES ---
+        const questions = [
+            // Data Structures (10)
+            { text: "I am a 1D structure containing elements of the same type (e.g., all numeric). What am I?", answer: "Atomic Vector", category: "Data Structures", diff: "Easy", clue: "The simplest R object.", logic: "1. 1D? Yes.\n2. Homogeneous? Yes.\n→ **Atomic Vector**.\n\n*Why not a Matrix?* Matrices are 2D.\n*Why not a List?* Lists are for mixing types.\n\n**Examples:**\n`c(1, 2, 3)`\n`c('a', 'b', 'c')`\n`logical(5)`" },
+            { text: "I am a recursive structure that can hold objects of different types (vectors, data frames, etc.).", answer: "List", category: "Data Structures", diff: "Easy", clue: "The most flexible container.", logic: "1. Recursive? Yes.\n2. Heterogeneous? Yes.\n→ **List**.\n\n*Why not a Data Frame?* Data frames require equal-length columns.\n\n**Examples:**\n`list(name='Bob', age=30)`\n`list(a=1:5, b='hello')`\n`list(matrix(1:4), function(x) x+1)`" },
+            { text: "I am a 2D structure where all elements must be of the same type.", answer: "Matrix", category: "Data Structures", diff: "Medium", clue: "Used for linear algebra.", logic: "1. 2D? Yes.\n2. Homogeneous? Yes.\n→ **Matrix**.\n\n*Why not a Data Frame?* Data Frames handle mixed types (text + numbers).\n\n**Examples:**\n`matrix(1:9, nrow=3)`\n`diag(4)`\n`matrix(TRUE, 2, 2)`" },
+            { text: "I am the standard structure for tabular data, where columns can have different types.", answer: "Data Frame", category: "Data Structures", diff: "Easy", clue: "Like a spreadsheet.", logic: "1. Tabular? Yes.\n2. Heterogeneous columns? Yes.\n→ **Data Frame**.\n\n**Examples:**\n`data.frame(x=1:5, y=letters[1:5])`\n`read.csv('file.csv')` returns a DF\n`as.data.frame(matrix(1:4, 2))`" },
+            { text: "I am an integer vector used to store categorical data with labels.", answer: "Factor", category: "Data Structures", diff: "Medium", clue: "Statistical modeling key.", logic: "1. Categorical? Yes.\n2. Integer under the hood? Yes.\n→ **Factor**.\n\n*Why not Character?* Factors use integers for efficiency in modeling.\n\n**Examples:**\n`factor(c('M', 'F', 'M'))`\n`gl(2, 4, labels=c('Control', 'Treat'))`\n`cut(rnorm(10), breaks=3)`" },
+            { text: "I am an N-dimensional generalization of a matrix.", answer: "Array", category: "Data Structures", diff: "Hard", clue: "More than 2 dims.", logic: "1. N-dims? Yes.\n2. Homogeneous? Yes.\n→ **Array**.\n\n*Why not a List?* Arrays enforce a single data type for all elements.\n\n**Examples:**\n`array(1:12, dim=c(2,3,2))`\n`array(0, c(5,5,5))`" },
+            { text: "What is the result of `c(1, 'a')`?", answer: "Atomic Vector", category: "Data Structures", diff: "Easy", clue: "Coercion rules.", logic: "1. Combining different atomic types?\n2. Coercion to least restrictive type (Character).\n→ **Atomic Vector**.\n\n*Why not a List?* `c()` creates atomic vectors. Use `list()` for mixed types.\n\n**Examples:**\n`c(TRUE, 1) -> 1, 1`\n`c(1, 'a') -> '1', 'a'`\n`c(FALSE, 'z') -> 'FALSE', 'z'`" },
+            { text: "What is the internal structure of a Data Frame?", answer: "List", category: "Data Structures", diff: "Boss", clue: "Under the hood.", logic: "1. It's a list of vectors of equal length.\n→ **List**.\n\n*Why not a Matrix?* Matrices are atomic arrays, Data Frames are lists.\n\n**Examples:**\n`typeof(df)` returns 'list'\n`df[[1]]` accesses first column\n`lapply(df, class)` works because it's a list" },
+            { text: "Which type is used for `TRUE` / `FALSE`?", answer: "Atomic Vector", category: "Data Structures", diff: "Easy", clue: "Boolean logic.", logic: "1. Boolean values?\n→ **Atomic Vector** (Logical).\n\n**Examples:**\n`c(TRUE, FALSE)`\n`x > 5` returns logical vector\n`is.na(x)`" },
+            { text: "What structure is returned by `lm()`?", answer: "List", category: "Data Structures", diff: "Medium", clue: "Complex object.", logic: "1. Complex return object?\n→ **List**.\n\n*Why not a Data Frame?* Model objects have irregular components.\n\n**Examples:**\n`lm(y~x)` returns list\n`glm(y~x, family=binomial)` returns list\n`attributes(model)` shows list names" },
+
+            // I/O (10)
+            { text: "Function to read a comma-separated value file.", answer: "read.csv", category: "I/O", diff: "Easy", clue: "Standard import.", logic: "1. Reading CSV?\n→ **read.csv**.\n\n**Examples:**\n`read.csv('data.csv')`\n`read.csv('url', stringsAsFactors=FALSE)`\n`read.csv2` for semicolon separator" },
+            { text: "Function to save a single R object to a binary file.", answer: "saveRDS", category: "I/O", diff: "Medium", clue: "Serialization.", logic: "1. Saving one object?\n2. Binary?\n→ **saveRDS**.\n\n*Why not save?* `save()` saves the whole workspace or named objects, `saveRDS` saves the value itself.\n\n**Examples:**\n`saveRDS(model, 'model.rds')`\n`saveRDS(df, 'data.rds')`" },
+            { text: "Function to read general tabular data.", answer: "read.table", category: "I/O", diff: "Easy", clue: "General purpose.", logic: "1. Reading table?\n→ **read.table**.\n\n**Examples:**\n`read.table('file.txt')`\n`read.table('file.dat', sep='|')`\n`read.table('clipboard')`" },
+            { text: "Function to execute an R script from a file.", answer: "source", category: "I/O", diff: "Medium", clue: "Running code.", logic: "1. Running script?\n→ **source**.\n\n**Examples:**\n`source('script.R')`\n`source('functions.R')`" },
+            { text: "Low-level function to read data sequentially.", answer: "scan", category: "I/O", diff: "Hard", clue: "Flexible input.", logic: "1. Sequential read?\n→ **scan**.\n\n*Why not read.table?* `scan` is lower level and more flexible for irregular data.\n\n**Examples:**\n`scan('file.txt', what=numeric())`\n`scan(stdin())`" },
+            { text: "Function to restore an object saved with `saveRDS`.", answer: "readRDS", category: "I/O", diff: "Medium", clue: "Loading binary.", logic: "1. Loading RDS?\n→ **readRDS**.\n\n**Examples:**\n`my_model <- readRDS('model.rds')`\n`df <- readRDS('data.rds')`" },
+            { text: "Function to write a data frame to a text file.", answer: "write.table", category: "I/O", diff: "Easy", clue: "Exporting.", logic: "1. Writing table?\n→ **write.table**.\n\n**Examples:**\n`write.table(df, 'file.txt')`\n`write.csv(df, 'file.csv')`" },
+            { text: "Which function loads a workspace image (.RData)?", answer: "load", category: "I/O", diff: "Easy", clue: "Restoring session.", logic: "1. Loading workspace?\n→ **load**.\n\n**Examples:**\n`load('.RData')`\n`load('project_data.RData')`" },
+            { text: "Interface used by read functions to access files/URLs.", answer: "Connection", category: "I/O", diff: "Hard", clue: "Abstract link.", logic: "1. Link to external resource?\n→ **Connection**.\n\n**Examples:**\n`file('data.txt')`\n`url('http://...')`\n`gzfile('data.gz')`" },
+            { text: "Function to download a file from the internet.", answer: "download.file", category: "I/O", diff: "Medium", clue: "Getting web content.", logic: "1. Downloading?\n→ **download.file**.\n\n**Examples:**\n`download.file(url, dest)`" },
+
+            // Control Flow (10)
+            { text: "Loop that iterates over a sequence.", answer: "for loop", category: "Control Flow", diff: "Easy", clue: "Iteration.", logic: "1. Iterating sequence?\n→ **for loop**.\n\n**Examples:**\n`for(i in 1:10) print(i)`\n`for(name in names(df)) ...`" },
+            { text: "Conditional execution structure.", answer: "if/else", category: "Control Flow", diff: "Easy", clue: "Decision.", logic: "1. Condition check?\n→ **if/else**.\n\n**Examples:**\n`if(x > 0) print('Pos')`\n`if(check) A else B`" },
+            { text: "Loop that continues as long as a condition is true.", answer: "while loop", category: "Control Flow", diff: "Medium", clue: "Condition based loop.", logic: "1. Loop on condition?\n→ **while loop**.\n\n**Examples:**\n`while(x < 10) x <- x + 1`\n`while(TRUE) ...`" },
+            { text: "Statement to skip the current iteration of a loop.", answer: "next", category: "Control Flow", diff: "Medium", clue: "Skip.", logic: "1. Skipping iteration?\n→ **next**.\n\n**Examples:**\n`if(i %% 2 == 0) next`\n`if(is.na(x)) next`" },
+            { text: "Statement to exit a loop immediately.", answer: "break", category: "Control Flow", diff: "Medium", clue: "Stop looping.", logic: "1. Exiting loop?\n→ **break**.\n\n**Examples:**\n`if(i > 100) break`\n`if(found) break`" },
+            { text: "Infinite loop structure.", answer: "repeat", category: "Control Flow", diff: "Hard", clue: "No condition check.", logic: "1. Infinite loop?\n→ **repeat**.\n\n*Why not while?* `repeat` has no condition check; you must use `break`.\n\n**Examples:**\n`repeat { ... if(end) break }`" },
+            { text: "Function to select a value based on an expression (like a case statement).", answer: "switch", category: "Control Flow", diff: "Hard", clue: "Multiple choice.", logic: "1. Selection based on value?\n→ **switch**.\n\n**Examples:**\n`switch(type, mean=mean(x), median=median(x))`" },
+            { text: "Can `if` handle a vector condition of length > 1?", answer: "No (Warning)", category: "Control Flow", diff: "Hard", clue: "Vector logic.", logic: "1. `if` expects single logical.\n→ **No** (use `ifelse` for vectors).\n\n**Examples:**\n`if(c(T, F)) ...` # Warning!\n`if(all(x > 0)) ...` # Correct" },
+            { text: "Vectorized version of if/else.", answer: "ifelse", category: "Control Flow", diff: "Medium", clue: "Vector safe.", logic: "1. Vectorized condition?\n→ **ifelse**.\n\n**Examples:**\n`ifelse(x > 0, 'Pos', 'Neg')`\n`df$group <- ifelse(df$age > 18, 'Adult', 'Child')`" },
+            { text: "Operator to assign to global environment.", answer: "<<-", category: "Control Flow", diff: "Boss", clue: "Super assignment.", logic: "1. Global assignment?\n→ **<<-**.\n\n**Examples:**\n`count <<- count + 1`\n`cache <<- value`" },
+
+            // Functions (10)
+            { text: "Keyword to create a new function.", answer: "function definition", category: "Functions", diff: "Easy", clue: "Defining.", logic: "1. Creating function?\n→ **function definition**.\n\n**Examples:**\n`f <- function(x) x^2`\n`my_fun <- function() print('Hi')`" },
+            { text: "Function to return a value explicitly.", answer: "return()", category: "Functions", diff: "Easy", clue: "Sending back data.", logic: "1. Explicit return?\n→ **return()**.\n\n**Examples:**\n`if(err) return(NULL)`\n`return(result)`" },
+            { text: "Special argument to pass unnamed arguments to other functions.", answer: "... argument", category: "Functions", diff: "Medium", clue: "Ellipsis.", logic: "1. Variable arguments?\n→ **... argument**.\n\n**Examples:**\n`plot(x, y, ...)`\n`my_sum <- function(...) sum(...)`" },
+            { text: "Values assigned to arguments if user doesn't provide them.", answer: "argument defaults", category: "Functions", diff: "Easy", clue: "Fallback values.", logic: "1. Fallback values?\n→ **argument defaults**.\n\n**Examples:**\n`f <- function(x=0) ...`\n`read.csv(..., header=TRUE)`" },
+            { text: "A function without a name.", answer: "anonymous function", category: "Functions", diff: "Medium", clue: "Lambda.", logic: "1. No name?\n→ **anonymous function**.\n\n**Examples:**\n`lapply(x, function(y) y^2)`\n`(function(x) x+1)(10)`" },
+            { text: "The environment where a function was created.", answer: "Enclosing Environment", category: "Functions", diff: "Boss", clue: "Scoping.", logic: "1. Creation context?\n→ **Enclosing Environment**.\n\n**Examples:**\nFunctions defined in packages encloses package env.\nFunctions in scripts enclose GlobalEnv." },
+            { text: "What is the last evaluated expression in a function?", answer: "Implicit Return", category: "Functions", diff: "Medium", clue: "Automatic return.", logic: "1. Last expression?\n→ **Implicit Return**.\n\n**Examples:**\n`f <- function(x) x+1` returns x+1" },
+            { text: "Function used to match arguments.", answer: "match.call", category: "Functions", diff: "Hard", clue: "Argument matching.", logic: "1. Matching args?\n→ **match.call**.\n\n**Examples:**\nUsed internally to capture call structure." },
+            { text: "System used for generic functions like `print`.", answer: "S3", category: "Functions", diff: "Hard", clue: "Dispatch.", logic: "1. Generic dispatch?\n→ **S3**.\n\n**Examples:**\n`print`, `plot`, `summary`\n`mean.default`" },
+            { text: "Function to debug another function.", answer: "debug", category: "Functions", diff: "Medium", clue: "Troubleshooting.", logic: "1. Debugging?\n→ **debug**.\n\n**Examples:**\n`debug(my_fun)`\n`undebug(my_fun)`" },
+
+            // Apply Family (10)
+            { text: "Apply function over a list, returning a list.", answer: "lapply", category: "Apply Family", diff: "Easy", clue: "List apply.", logic: "1. Input: List/Vector.\n2. Output: List.\n→ **lapply**.\n\n*Why not sapply?* `sapply` tries to simplify; `lapply` guarantees a list.\n\n**Examples:**\n`lapply(df, class)`\n`lapply(1:5, runif)`" },
+            { text: "Apply function over a list, trying to simplify the result.", answer: "sapply", category: "Apply Family", diff: "Easy", clue: "Simple apply.", logic: "1. Input: List.\n2. Output: Simplified.\n→ **sapply**.\n\n**Examples:**\n`sapply(df, is.numeric)`\n`sapply(1:5, sqrt)`" },
+            { text: "Apply function over array margins (rows/cols).", answer: "apply", category: "Apply Family", diff: "Medium", clue: "Margins.", logic: "1. Input: Array/Matrix.\n2. Margins?\n→ **apply**.\n\n**Examples:**\n`apply(mat, 1, sum)` (Row sums)\n`apply(mat, 2, mean)` (Col means)" },
+            { text: "Apply function over ragged array (groups).", answer: "tapply", category: "Apply Family", diff: "Medium", clue: "Table/Group apply.", logic: "1. Grouped data?\n→ **tapply**.\n\n**Examples:**\n`tapply(df$value, df$group, mean)`\n`tapply(x, index, sum)`" },
+            { text: "Multivariate version of sapply.", answer: "mapply", category: "Apply Family", diff: "Hard", clue: "Multiple arguments.", logic: "1. Multiple inputs?\n→ **mapply**.\n\n**Examples:**\n`mapply(rep, 1:4, 4:1)`\n`mapply(sum, vec1, vec2)`" },
+            { text: "Safe version of sapply with pre-specified return type.", answer: "vapply", category: "Apply Family", diff: "Hard", clue: "Verified apply.", logic: "1. Type safe?\n→ **vapply**.\n\n**Examples:**\n`vapply(x, f, numeric(1))`\n`vapply(df, is.numeric, logical(1))`" },
+            { text: "Environment used to run parallel apply (package).", answer: "parallel", category: "Apply Family", diff: "Boss", clue: "Multi-core.", logic: "1. Parallel computing?\n→ **parallel**.\n\n**Examples:**\n`mclapply`\n`parLapply`" },
+            { text: "Recursive apply function.", answer: "rapply", category: "Apply Family", diff: "Boss", clue: "Recursive.", logic: "1. Recursive list?\n→ **rapply**.\n\n**Examples:**\n`rapply(nested_list, f)`" },
+            { text: "Alternative to `for` loop for side effects.", answer: "l_ply (plyr) / walk (purrr)", category: "Apply Family", diff: "Hard", clue: "Side effects only.", logic: "1. Side effects?\n→ **walk / l_ply** (Conceptually correct).\n\n**Examples:**\n`purrr::walk(plots, print)`" },
+            { text: "Applying a function to an environment.", answer: "eapply", category: "Apply Family", diff: "Boss", clue: "Env apply.", logic: "1. Environment?\n→ **eapply**.\n\n**Examples:**\n`eapply(.GlobalEnv, class)`" }
+        ];
+
+        // --- STATE ---
+        let state = {
+            screen: 'start', lives: 3, score: 0, index: 0, 
+            initialTime: 300, timeLeft: 300, timerId: null,
+            currentRun: [], 
+            tooltipsUnlocked: false,
+            processing: false,
+            currentOptions: [] 
+        };
+
+        const els = {};
+
+        // --- SPAWN FLOATING TEXT (Defined Early) ---
+        function spawnFloatingText(targetEl, text, color) {
+            if (!targetEl) return;
+            const rect = targetEl.getBoundingClientRect();
+            const el = document.createElement('div');
+            el.innerText = text;
+            el.className = 'floating-text text-xl';
+            el.style.left = `${rect.left + rect.width/2}px`;
+            el.style.top = `${rect.top}px`;
+            el.style.color = color;
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 1000);
+        }
+
+        function mapElements() {
+            // Map Elements
+            ['start', 'battle', 'gameover', 'victory', 'library'].forEach(id => els[id] = document.getElementById(`${id}-screen`));
+            
+            els.lives = document.getElementById('lives-container');
+            els.timer = document.getElementById('timer-display');
+            els.score = document.getElementById('score-display');
+            els.warning = document.getElementById('time-warning');
+            els.hudQCurrent = document.getElementById('hud-q-current'); 
+            
+            els.diffBadge = document.getElementById('diff-badge');
+            els.cardTitle = document.getElementById('scenario-title');
+            els.cardDesc = document.getElementById('scenario-desc');
+            els.overlay = document.getElementById('reaction-overlay');
+            els.gameCard = document.getElementById('game-card');
+            
+            els.btnDeep = document.getElementById('btn-deep-logic');
+            els.btnHint = document.getElementById('btn-hint');
+            els.btnReveal = document.getElementById('btn-reveal');
+            
+            els.panelDeep = document.getElementById('panel-deep-logic');
+            els.panelHint = document.getElementById('panel-hint');
+            
+            els.revealModal = document.getElementById('reveal-modal');
+            els.revealCorrectDist = document.getElementById('reveal-correct-dist');
+            els.revealExplanation = document.getElementById('reveal-explanation');
+            
+            els.grimoireStatus = document.getElementById('grimoire-status');
+            els.grimoireContainer = document.getElementById('grimoire-container');
+            
+            els.optionsGrid = document.getElementById('options-grid');
+            els.tooltipLocked = document.getElementById('tooltip-locked');
+            els.tooltipActive = document.getElementById('tooltip-active');
+        }
+
+        // --- INIT ---
+        window.addEventListener('DOMContentLoaded', () => {
+            mapElements();
+            lucide.createIcons();
+            buildLibrary(); 
+            drawViz();
+        });
+
+        // --- LOGIC PARSER ---
+        function parseLogic(logicString) {
+            if (!logicString) return "";
+            let inExamples = false;
+
+            return logicString.split('\n')
+                .filter(line => line.trim() !== '')
+                .map(line => {
+                    if(line.includes('**Examples:**')) {
+                         inExamples = true;
+                         return `<div class="logic-why" style="color: #fbbf24; margin-top:12px;">Examples:</div>`;
+                    }
+                    
+                    if(inExamples) {
+                        return `<div class="example-box">${line}</div>`;
+                    }
+
+                    if(line.trim().startsWith('→')) {
+                        return `<div class="logic-conclusion">${line}</div>`;
+                    } else if(line.trim().startsWith('*Why') || line.trim().startsWith('Why')) {
+                        return `<div class="logic-why">${line.replace(/\*/g, '')}</div>`;
+                    } else {
+                        return `<div class="logic-step">${line}</div>`;
+                    }
+                }).join('');
+        }
+
+        // --- GAME LOGIC ---
+        window.prepareGame = function(minutes) {
+            mapElements(); 
+            const totalSeconds = minutes * 60;
+            const shuffle = (arr) => arr.sort(() => 0.5 - Math.random());
+            const run = shuffle([...questions]).slice(0, 10);
+
+            state = {
+                screen: 'battle', lives: 3, score: 0, index: 0,
+                initialTime: totalSeconds, timeLeft: totalSeconds, timerId: null,
+                currentRun: run,
+                tooltipsUnlocked: false, processing: false,
+                currentOptions: []
+            };
+            
+            startGame();
+        }
+
+        function startGame() {
+            showScreen('battle');
+            state.timerId = setInterval(gameLoop, 1000);
+            loadLevel();
+            updateHUD();
+        }
+
+        function gameLoop() {
+            state.timeLeft--;
+            if(state.timeLeft <= 0) gameOver("RUNTIME_EXCEEDED");
+            updateHUD();
+        }
+
+        function loadLevel() {
+            const sc = state.currentRun[state.index];
+            if (!sc) return;
+
+            if (els.cardTitle) els.cardTitle.innerText = `${sc.category} Protocol`;
+            if (els.cardDesc) els.cardDesc.innerText = sc.text;
+            if (els.diffBadge) els.diffBadge.innerText = sc.diff;
+            
+            let badgeColor = 'text-green-400 border-green-500/50';
+            if(sc.diff === 'Medium') badgeColor = 'text-yellow-400 border-yellow-500/50';
+            if(sc.diff === 'Hard' || sc.diff === 'Boss') badgeColor = 'text-red-400 border-red-500/50';
+            if (els.diffBadge) els.diffBadge.className = `text-xs font-bold px-2 py-1 rounded border ${badgeColor}`;
+
+            // Reset UI
+            els.panelDeep?.classList.add('hidden');
+            els.panelHint?.classList.add('hidden');
+            els.overlay?.classList.add('hidden');
+            els.revealModal?.classList.add('hidden');
+            els.gameCard?.classList.remove('animate-shake');
+            
+            // Reset Buttons
+            els.btnDeep?.removeAttribute('disabled');
+            els.btnDeep?.classList.remove('opacity-50', 'cursor-not-allowed');
+            els.btnHint?.removeAttribute('disabled');
+            els.btnHint?.classList.remove('opacity-50', 'cursor-not-allowed');
+            els.btnReveal?.removeAttribute('disabled');
+            els.btnReveal?.classList.remove('opacity-50', 'cursor-not-allowed');
+            
+            state.tooltipsUnlocked = false;
+            els.tooltipLocked?.classList.remove('hidden');
+            els.tooltipActive?.classList.add('hidden');
+            
+            // Hint Panel
+            if (document.getElementById('hint-text')) document.getElementById('hint-text').innerText = sc.clue;
+
+            // Reset Inspect Panel
+            if (document.getElementById('deep-logic-text')) document.getElementById('deep-logic-text').innerHTML = "...";
+
+            generateButtons(sc);
+            state.processing = false;
+        }
+
+        function generateButtons(scenario) {
+            if (!els.optionsGrid) return;
+            
+            const category = scenario.category;
+            const correctAns = scenario.answer;
+            let possibleAnswers = categories[category] || [];
+            let distractors = possibleAnswers.filter(a => a !== correctAns);
+            
+            distractors.sort(() => 0.5 - Math.random());
+            distractors = distractors.slice(0, 3);
+            
+            let options = [correctAns, ...distractors].sort(() => 0.5 - Math.random());
+            state.currentOptions = options; 
+            
+            els.optionsGrid.innerHTML = options.map(opt => `
+                <button 
+                    onclick="handleAnswer('${opt.replace(/'/g, "\\'")}')"
+                    class="btn-neon bg-slate-800 hover:bg-blue-700 text-white text-xs py-4 px-2 rounded border border-slate-600 hover:border-blue-400 transition-all shadow-md font-mono">
+                    ${opt}
+                </button>
+            `).join('');
+        }
+
+        // --- MODIFIED: REVEAL DEEP LOGIC (INSPECT OBJECT) ---
+        window.revealDeepLogic = function() {
+            if(state.score > 0) state.score = Math.max(0, state.score - 20);
+            
+            let definitionHtml = "";
+            state.currentOptions.forEach(optName => {
+                const concept = r_concepts.find(c => c.name === optName || c.id === optName);
+                if(concept) {
+                    definitionHtml += `<div class="mb-2 pb-2 border-b border-purple-500/30">
+                        <strong class="text-purple-300">${concept.name}:</strong> <span class="text-slate-400 text-xs block">${concept.desc}</span>
+                    </div>`;
+                }
+            });
+
+            if (document.getElementById('deep-logic-text')) {
+                document.getElementById('deep-logic-text').innerHTML = definitionHtml || "No definitions found.";
+            }
+
+            els.panelDeep?.classList.remove('hidden');
+            els.btnDeep?.setAttribute('disabled', 'true');
+            els.btnDeep?.classList.add('opacity-50', 'cursor-not-allowed');
+            updateHUD();
+        }
+
+        // --- REVEAL ANSWER (SURRENDER) ---
+        window.revealAnswer = function() {
+            state.score -= 100;
+            updateHUD();
+            
+            const sc = state.currentRun[state.index];
+            const logicHtml = parseLogic(sc.logic); // Full logic + examples
+
+            if (els.revealCorrectDist) els.revealCorrectDist.innerText = sc.answer;
+            if (els.revealExplanation) els.revealExplanation.innerHTML = logicHtml;
+            
+            els.revealModal?.classList.remove('hidden');
+            els.revealModal?.classList.add('flex');
+        }
+
+        window.finishReveal = function() {
+            window.closeReveal();
+            nextLevel();
+        }
+
+        window.closeReveal = function() {
+            els.revealModal?.classList.add('hidden');
+            els.revealModal?.classList.remove('flex');
+        }
+
+        window.handleAnswer = function(ans) {
+            if(state.processing) return;
+            state.processing = true;
+            
+            const sc = state.currentRun[state.index];
+            if(ans === sc.answer) {
+                if (els.score) spawnFloatingText(els.score, "+100", "#4ade80");
+                state.score += 100;
+                showReaction(true, "Syntax Validated!");
+            } else {
+                state.lives--;
+                updateHUD();
+                els.gameCard?.classList.remove('animate-shake');
+                void els.gameCard?.offsetWidth; 
+                els.gameCard?.classList.add('animate-shake');
+                
+                if(state.lives <= 0) {
+                    setTimeout(() => gameOver("SEGFAULT (0 Lives)"), 500);
+                } else {
+                    showReaction(false, "Syntax Error!");
+                }
+            }
+        }
+
+        function showReaction(isSuccess, msg) {
+            els.overlay?.classList.remove('hidden');
+            const sc = state.currentRun[state.index]; 
+
+            if(isSuccess) {
+                triggerConfetti();
+                
+                const logicHtml = parseLogic(sc.logic); // Logic + Examples
+
+                if (els.overlay) {
+                    els.overlay.innerHTML = `
+                        <div class="animate-pop flex flex-col items-center max-w-2xl w-full mx-4 my-auto h-full">
+                            <div class="bg-green-500/20 p-4 rounded-full mb-4 ring-2 ring-green-500 ring-offset-2 ring-offset-slate-900 mt-8 flex-shrink-0">
+                                <i data-lucide="check" class="w-8 h-8 text-green-400"></i>
+                            </div>
+                            <h2 class="text-3xl font-bold text-white mb-1 flex-shrink-0">COMPILED</h2>
+                            <p class="text-green-400 text-sm font-bold tracking-widest uppercase mb-6 flex-shrink-0">${sc.answer} Identified</p>
+                            
+                            <div class="flex-1 min-h-0 w-full overflow-y-auto force-scroll mb-6 pr-2">
+                                <div class="bg-slate-900 border-l-4 border-green-500 p-6 rounded-r-lg text-left shadow-2xl">
+                                    <p class="text-slate-400 text-xs uppercase font-bold mb-2 font-mono">Code Analysis</p>
+                                    <p class="text-slate-300 text-sm italic mb-6 opacity-80 leading-relaxed">"${sc.text}"</p>
+                                    
+                                    <p class="text-blue-400 text-xs uppercase font-bold mb-3 font-mono">Execution Logic</p>
+                                    <div class="text-white text-sm font-medium font-mono">${logicHtml}</div>
+                                </div>
+                            </div>
+
+                            <button onclick="window.finishTurn(true)" class="flex-shrink-0 btn-neon bg-green-600 hover:bg-green-500 text-black font-bold py-3 px-12 rounded shadow-[0_0_20px_rgba(34,197,94,0.4)] w-full sm:w-auto mb-12 uppercase tracking-widest">
+                                Run Next Line
+                            </button>
+                        </div>
+                    `;
+                }
+            } else {
+                if (els.overlay) {
+                    els.overlay.innerHTML = `
+                        <div class="animate-pop flex flex-col items-center justify-center h-full">
+                            <i data-lucide="x-octagon" class="w-16 h-16 text-red-500 mb-4 animate-glitch"></i>
+                            <h2 class="text-3xl font-bold text-red-500 mb-2 font-mono">ERROR</h2>
+                            <p class="text-red-200 mb-6 font-mono">${msg}</p>
+                            <button onclick="window.closeOverlay()" class="btn-neon bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 px-8 rounded font-mono">try()</button>
+                        </div>
+                    `;
+                }
+            }
+            lucide.createIcons();
+        }
+
+        window.finishTurn = function(success) { 
+            els.overlay?.classList.add('hidden'); 
+            if (success) { 
+                updateHUD(); 
+                nextLevel(); 
+            } 
+        };
+
+        function nextLevel() {
+            state.index++;
+            if(state.index >= 10) {
+                victory();
+            } else {
+                loadLevel();
+                updateHUD();
+            }
+        }
+
+        window.closeOverlay = function() {
+            els.overlay?.classList.add('hidden');
+            state.processing = false;
+        }
+
+        window.revealHint = function() {
+            if(state.score > 0) state.score = Math.max(0, state.score - 25);
+            els.panelHint?.classList.remove('hidden');
+            els.btnHint?.setAttribute('disabled', 'true');
+            els.btnHint?.classList.add('opacity-50', 'cursor-not-allowed');
+            updateHUD();
+        }
+
+        window.toggleGrimoire = function() {
+            if(els.grimoireContainer?.classList.contains('hidden')) {
+                if(state.score > 0) state.score = Math.max(0, state.score - 50);
+                els.grimoireContainer.classList.remove('hidden');
+                if (els.grimoireStatus) els.grimoireStatus.innerText = "Close Reference";
+                updateHUD();
+            } else {
+                els.grimoireContainer?.classList.add('hidden');
+                if (els.grimoireStatus) els.grimoireStatus.innerText = "Reference Card (-50)";
+            }
+        }
+
+        window.unlockTooltips = function() {
+            if(state.score > 0) state.score = Math.max(0, state.score - 20);
+            state.tooltipsUnlocked = true;
+            els.tooltipLocked?.classList.add('hidden');
+            els.tooltipActive?.classList.remove('hidden');
+            updateHUD();
+        }
+
+        window.updateHover = function(id) {}
+
+        window.resetHover = function() {
+            if(!state.tooltipsUnlocked) return;
+            if (els.tooltipActive) els.tooltipActive.innerHTML = "Hover to inspect object properties...";
+        }
+
+        function updateHUD() {
+            if (els.score) els.score.innerText = state.score;
+            if(els.hudQCurrent) els.hudQCurrent.innerText = state.index + 1;
+            
+            const m = Math.floor(state.timeLeft / 60);
+            const s = (state.timeLeft % 60).toString().padStart(2, '0');
+            if (els.timer) els.timer.innerText = `${m}:${s}`;
+            
+            if(state.timeLeft < 60) {
+                els.timer?.classList.add('text-red-500', 'animate-pulse');
+                els.warning?.classList.remove('hidden');
+            } else {
+                els.timer?.classList.remove('text-red-500', 'animate-pulse');
+                els.warning?.classList.add('hidden');
+            }
+
+            if (els.lives) {
+                els.lives.innerHTML = Array(3).fill(0).map((_, i) => 
+                    `<i data-lucide="heart" class="w-6 h-6 ${i < state.lives ? 'text-red-500 fill-red-500' : 'text-slate-700 fill-slate-800'}"></i>`
+                ).join('');
+            }
+            lucide.createIcons();
+        }
+
+        function showScreen(id) {
+            Object.values(els).forEach(el => {
+                if(el && el.id && el.id.endsWith('-screen')) {
+                    el.classList.remove('flex');
+                    el.classList.add('hidden');
+                }
+            });
+            const target = document.getElementById(`${id}-screen`);
+            target?.classList.remove('hidden');
+            target?.classList.add('flex');
+        }
+
+        function buildGrimoire() {
+            if (!els.grimoireContainer) return;
+            let html = "";
+            for (const [cat, items] of Object.entries(categories)) {
+                html += `<div class="mb-4"><strong class="text-blue-400 font-mono block border-b border-slate-700 mb-2">${cat}</strong><div class="grid grid-cols-2 gap-2">`;
+                items.forEach(item => {
+                    html += `<span class="text-xs text-slate-400 bg-slate-800 p-1 rounded">${item}</span>`;
+                });
+                html += `</div></div>`;
+            }
+            els.grimoireContainer.innerHTML = html;
+        }
+
+        function buildLibrary() {
+            const libContent = document.getElementById('library-content');
+            if (!libContent) return;
+            let html = "";
+            for (const [cat, items] of Object.entries(categories)) {
+                html += `<div class="bg-slate-800 p-4 rounded border border-slate-600 mb-4">
+                    <h3 class="text-lg font-bold text-white mb-2 font-mono">${cat}</h3>
+                    <div class="flex flex-wrap gap-2">`;
+                items.forEach(item => {
+                     html += `<span class="text-xs text-blue-200 bg-slate-900 p-2 rounded font-mono">${item}</span>`;
+                });
+                html += `</div></div>`;
+            }
+            libContent.innerHTML = html;
+        }
+
+        function drawViz() {
+            const cvs = document.getElementById('viz-canvas');
+            if (!cvs) return;
+            const ctx = cvs.getContext('2d');
+            cvs.width = cvs.offsetWidth;
+            cvs.height = cvs.offsetHeight;
+            
+            const barCount = 20;
+            const barWidth = cvs.width / barCount;
+            let bars = Array(barCount).fill(0).map(() => Math.random() * cvs.height);
+            
+            function animate() {
+                ctx.fillStyle = '#0f172a';
+                ctx.fillRect(0, 0, cvs.width, cvs.height);
+                for(let i=0; i<barCount; i++) {
+                    bars[i] += (Math.random() - 0.5) * 4;
+                    bars[i] = Math.max(10, Math.min(cvs.height - 10, bars[i]));
+                    const h = bars[i];
+                    const x = i * barWidth;
+                    const y = cvs.height - h;
+                    ctx.fillStyle = '#3b82f6';
+                    ctx.fillRect(x + 2, y, barWidth - 4, h);
+                }
+                requestAnimationFrame(animate);
+            }
+            animate();
+        }
+
+        window.resetGame = function() {
+            clearInterval(state.timerId);
+            showScreen('start');
+        }
+        window.returnToStart = function() { resetGame(); }
+        window.showLibrary = function() { showScreen('library'); }
+        
+        window.victory = function() {
+            clearInterval(state.timerId);
+            if (document.getElementById('final-score')) document.getElementById('final-score').innerText = state.score;
+            if (document.getElementById('final-time')) document.getElementById('final-time').innerText = els.timer ? els.timer.innerText : "00:00";
+            showScreen('victory');
+        }
+        window.gameOver = function(reason) {
+            clearInterval(state.timerId);
+            if (document.getElementById('gameover-reason')) document.getElementById('gameover-reason').innerText = reason;
+            showScreen('gameover');
+        }
+
+        function triggerConfetti() {
+            const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'];
+            for(let i=0; i<40; i++) {
+                const el = document.createElement('div');
+                el.className = 'confetti-piece';
+                el.style.backgroundColor = colors[Math.floor(Math.random()*colors.length)];
+                el.style.left = Math.random()*100 + 'vw';
+                el.style.animation = `fall ${2+Math.random()*3}s linear forwards`;
+                document.body.appendChild(el);
+                setTimeout(() => el.remove(), 5000);
+            }
+        }
+
+    </script>
+</body>
+</html>
