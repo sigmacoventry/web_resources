@@ -1,0 +1,1488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Forensic Analyst Simulator — Ninty Edition</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* --- THEME --- */
+:root{
+  --bg:#0a0f1f;--fg:#e5e7eb;--mut:#9fb0d1;--p:#0e1730;--b:#223059;--acc:#7bdcf4;
+  --ok:#86efac;--warn:#fca5a5;--glass:#7dd3fc;--dna:#a78bfa;--fiber:#fbbf24;
+  --shadow-card: 0 4px 12px rgba(0,0,0,0.25);
+  --shadow-hover: 0 8px 20px rgba(0,0,0,0.3);
+  --ease-out: cubic-bezier(0.165, 0.84, 0.44, 1);
+  
+  /* NINTENDO STYLE VARS */
+  --nin-blue: #0070f3; /* Mario Blue */
+  --nin-red: #e60012;  /* Mario Red */
+  --nin-green: #25d366;/* Luigi Green */
+  --nin-yellow: #facc15; /* Coin Yellow */
+  --nin-grey: #64748b; /* Controller Grey */
+  --nin-white: #ffffff;
+  --nin-shadow: 4px 4px 0px rgba(0,0,0,0.2);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 "Inter", sans-serif; overflow-x: hidden;}
+
+/* Allow vertical scroll when locked, but prevent horizontal */
+body.retro-lock{
+  overflow-y: auto;   /* vertical scrollbar allowed */
+  overflow-x: hidden; /* keep current horizontal behaviour */
+}
+
+.wrap{max-width:1040px;margin:auto;padding:20px; padding-bottom: 200px;}
+
+/* --- LAYOUT UTILS --- */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.hidden{display:none !important;}
+.mut{color:var(--mut);font-size:13px}
+
+/* --- COMPONENTS --- */
+.card{
+  background:var(--p);
+  border:1px solid var(--b);
+  border-radius:14px;
+  padding:20px;
+  margin-bottom:16px;
+  position:relative;
+  box-shadow: var(--shadow-card);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.soft{background:#0b1125;border:1px solid #26365f;border-radius:10px;padding:16px}
+
+.btn{
+  background:#111a36; border:1px solid var(--b); color:var(--fg);
+  padding:10px 14px; border-radius:10px; cursor:pointer; font-weight:600; font-family:inherit;
+  transition: all 0.1s; position:relative; top:0;
+}
+.btn:hover{background:#1a2549;border-color:#4a5e99;transform:translateY(-1px);}
+.btn:active{top:1px;}
+.btn.primary{background:var(--acc); color:#0a0f1f; border-color:transparent;}
+.btn.primary:hover{background:#a1e7fa;}
+.btn:disabled{opacity:0.5; cursor:not-allowed; top:0; filter: grayscale(1);}
+.btn.sm{font-size:12px; padding:6px 10px;}
+.btn.info-btn { 
+    padding: 2px 8px; border-radius: 12px; font-size: 11px; 
+    border: 1px solid var(--mut); margin-left: 6px; 
+    vertical-align: middle; background: transparent; color: var(--acc);
+}
+.close-btn { 
+    position: absolute; top: 10px; right: 10px; 
+    background: transparent; border: none; color: var(--mut); 
+    font-size: 20px; cursor: pointer; line-height: 1; 
+    width: 24px; height: 24px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+}
+.close-btn:hover { background: rgba(255,255,255,0.1); color: var(--warn); }
+
+/* --- HEADER --- */
+.hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;}
+.kpis{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.kpi{background:#0b1224;border:1px solid #2a3a67;border-radius:10px;padding:8px 14px;font-size:14px;font-weight:600; position: relative;}
+.score-pop { animation: popIn 0.3s var(--ease-out); color: var(--ok); border-color: var(--ok); }
+.score-drop { animation: shake 0.4s; color: var(--warn); border-color: var(--warn); }
+.clickable-kpi { cursor: pointer; transition: border-color 0.2s; }
+.clickable-kpi:hover { border-color: var(--acc); background: #111a36; }
+
+/* Floating XP/Cred Animation */
+.floater {
+    position: absolute; top: -20px; right: 0;
+    font-weight: 800; font-size: 14px; pointer-events: none;
+    animation: floatUp 1s ease-out forwards;
+}
+@keyframes floatUp {
+    0% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(-30px); }
+}
+
+/* --- CABINET TILES --- */
+.board{display:grid;grid-template-columns:repeat(auto-fill, minmax(180px, 1fr));gap:16px}
+.tile{
+  background:#0c1630; border:1px solid #2a3a67; border-top:6px solid var(--acc);
+  border-radius:12px; height:140px; padding:16px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  cursor:pointer; transition:all 0.2s; position:relative; overflow:hidden;
+}
+.tile:hover{transform:translateY(-4px); box-shadow: var(--shadow-hover); border-color: var(--acc);}
+.tile-icon{font-size:32px; margin-bottom:8px;}
+.tile-title{font-size:14px; text-align:center; font-weight:700;}
+.tile-tag { font-size: 10px; background: #0f172a; padding: 2px 6px; border-radius: 4px; margin-top: 6px; color: var(--mut); text-transform: uppercase; font-weight: 700;}
+
+/* --- BUILDER (Step 1) --- */
+.decision-box { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+.level-card {
+  background: #0f172a; border: 2px solid #334155; border-radius: 12px; padding: 16px;
+  cursor: pointer; transition: all 0.2s; text-align: center;
+}
+.level-card:hover { border-color: var(--acc); transform: translateY(-2px); }
+.level-title { font-weight: 800; text-transform: uppercase; font-size: 14px; margin-bottom: 4px; }
+.level-desc { font-size: 12px; color: var(--mut); }
+
+.slot-container { margin-top: 12px; }
+.slot-label { font-size: 12px; text-transform: uppercase; color: var(--mut); margin-bottom: 4px; font-weight: 800; letter-spacing: 0.05em; }
+.sentence-slot {
+  min-height: 50px; background: #1e293b; border: 2px solid #334155; border-radius: 12px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 12px;
+  transition: border-color 0.2s; cursor: pointer;
+}
+.sentence-slot.active { border-color: var(--acc); background: rgba(123,220,244,0.05); }
+
+.bank-container { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+.bank-section { background: #0b1120; border-radius: 12px; padding: 10px; border: 2px dashed #334155; }
+.bank-label { font-size: 11px; text-transform: uppercase; font-weight: 800; margin-bottom: 8px; text-align: center;}
+.word-tile {
+  background: #1e293b; color: #f1f5f9; padding: 6px 10px; border-radius: 8px;
+  font-weight: 600; cursor: pointer; border: 1px solid #334155; font-size: 13px; margin-bottom: 6px; display: inline-block; margin-right: 6px;
+}
+/* SPECIFIC COLORS FOR FRAGMENTS */
+.word-tile.source-tile { border-color: var(--dna); color: var(--dna); background: rgba(167, 139, 250, 0.15); }
+.word-tile.source-tile:hover { background: rgba(167, 139, 250, 0.25); }
+.word-tile.activity-tile { border-color: var(--fiber); color: var(--fiber); background: rgba(251, 191, 36, 0.15); }
+.word-tile.activity-tile:hover { background: rgba(251, 191, 36, 0.25); }
+
+.word-tile:active { transform: scale(0.95); }
+
+/* --- STEP 2: VISUALIZER & DYNAMIC FRACTION --- */
+.fraction-wrap { display: flex; align-items: center; justify-content: center; gap: 10px; font-family: monospace; font-size: 16px; margin: 10px 0; }
+.frac-line { height: 2px; background: var(--fg); width: 100%; margin: 4px 0; }
+.frac-num { color: var(--ok); text-align: center; font-weight: bold; }
+.frac-den { color: var(--warn); text-align: center; font-weight: bold; transition: color 0.3s; }
+.eq-sign { font-size: 24px; color: var(--mut); }
+.lr-result { font-size: 32px; color: var(--acc); font-weight: 800; text-shadow: 0 0 10px rgba(123,220,244,0.3); min-width: 60px; text-align: left; }
+
+.intuition-box {
+  background: rgba(123, 220, 244, 0.05); 
+  border: 1px solid rgba(123, 220, 244, 0.3); 
+  border-left: 4px solid var(--acc);
+  border-radius: 8px; 
+  padding: 12px; 
+  margin-top: 16px; 
+  font-size: 13px; 
+  color: var(--fg);
+  line-height: 1.6;
+}
+.highlight-val { color: var(--acc); font-weight: bold; }
+.highlight-warn { color: var(--warn); font-weight: bold; }
+
+/* POPULATION GRID (Nintendo Style) */
+.pop-grid { display: grid; grid-template-columns: repeat(20, 1fr); gap: 3px; max-width: 400px; margin: 15px auto; padding: 10px; background: #080c18; border-radius: 12px; border: 2px solid #334155; }
+.dot { width: 8px; height: 8px; background: #1e293b; border-radius: 2px; transition: background 0.1s; }
+.dot.active { background: var(--warn); box-shadow: 0 0 4px var(--warn); }
+.dot.me { background: var(--ok) !important; box-shadow: 0 0 6px var(--ok); z-index: 2; }
+
+input[type=range] { -webkit-appearance: none; width: 100%; margin: 10px 0; background: transparent; }
+input[type=range]:focus { outline: none; }
+input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 12px; cursor: pointer; background: #334155; border-radius: 6px; }
+input[type=range]::-webkit-slider-thumb {
+  height: 28px; width: 28px; border-radius: 50%; background: var(--acc); cursor: pointer;
+  -webkit-appearance: none; margin-top: -9px; box-shadow: 0 0 10px rgba(123,220,244,0.5); border: 2px solid #fff;
+}
+
+/* --- EDITOR (Step 3) --- */
+.editor-box { font-size: 17px; line-height: 1.8; color: #cbd5e1; font-family: 'Georgia', serif; }
+.clickable-word { border-bottom: 2px dashed var(--mut); cursor: pointer; padding: 0 2px; border-radius: 4px; }
+.clickable-word:hover { background: rgba(255,255,255,0.1); color: white; }
+.clickable-word.bad { color: var(--warn); border-bottom-color: var(--warn); background: rgba(252,165,165,0.1); }
+.clickable-word.fixed { color: var(--ok); border-bottom: none; background: rgba(134,239,172,0.1); cursor: default; }
+
+.correction-menu {
+  position: absolute; background: #1e293b; border: 2px solid var(--acc);
+  border-radius: 12px; padding: 6px; z-index: 100; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  display: flex; flex-direction: column; gap: 4px; min-width: 200px;
+}
+.correction-option { padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 14px; text-align: left; background: transparent; border: none; color: white; transition: background 0.1s; }
+.correction-option:hover { background: var(--acc); color: #0f172a; }
+
+/* --- SUMMARY SCALES --- */
+.scale-wrap { width: 100%; margin: 20px auto; position: relative; height: 160px; max-width: 320px; overflow: hidden; }
+.scale-labels { display: flex; justify-content: space-between; font-size: 12px; color: var(--mut); font-weight: 700; padding: 0 12px; position: absolute; top: 0; width: 100%; }
+.scale-bar { height: 8px; background: #9fb0d1; border-radius: 4px; position: absolute; top: 70px; left: 10px; right: 10px; transform-origin: center; transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 1; }
+.scale-fulcrum { position: absolute; top: 78px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 12px solid transparent; border-right: 12px solid transparent; border-bottom: 20px solid #334155; z-index: 0; }
+.scale-marker { position: absolute; top: -30px; transform: translateX(-50%); font-size: 11px; color: #cbd5e1; background: #0b1224; border: 1px solid #1f2a44; border-radius: 8px; padding: 4px 8px; transition: left 0.8s ease; white-space: nowrap; z-index: 2; font-weight: 700; }
+.scale-marker::after { content: ""; position: absolute; left: 50%; top: 100%; transform: translateX(-50%); width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 6px solid #1f2a44; }
+
+/* --- MATH OVERLAY --- */
+.math-overlay { position: fixed; bottom: 20px; left: 20px; background: rgba(15, 23, 42, 0.95); border: 1px solid var(--acc); border-radius: 12px; padding: 16px; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.5); font-family: monospace; font-size: 13px; min-width: 220px; transition: opacity 0.3s, transform 0.3s; opacity: 0; pointer-events: none; transform: translateY(10px); }
+.math-overlay.visible { opacity: 1; pointer-events: auto; transform: translateY(0); }
+.math-overlay h5 { margin: 0 0 10px 0; color: var(--acc); border-bottom: 1px dashed var(--b); padding-bottom: 4px; }
+.math-row { display: flex; justify-content: space-between; margin-bottom: 6px; }
+.math-val { color: var(--ok); font-weight: 700; }
+
+/* --- GUIDED CASE (Input) --- */
+.calc-input { background: #0a0f1f; border: 1px solid var(--b); color: var(--fg); border-radius: 8px; padding: 8px; font-size: 16px; text-align: center; max-width: 100px; margin: 0 8px;}
+.calc-input:focus { outline: none; border-color: var(--acc); }
+.feedback { font-size: 13px; margin-top: 6px; min-height: 18px; font-weight: 700;}
+.feedback.good { color: var(--ok); }
+.feedback.bad { color: var(--warn); }
+
+/* --- ANIMATIONS --- */
+@keyframes popIn { 0% { opacity:0; transform:scale(0.8); } 100% { opacity:1; transform:scale(1); } }
+@keyframes shake { 0%, 100% { transform:translateX(0); } 25% { transform:translateX(-4px); } 75% { transform:translateX(4px); } }
+.shake-text { animation: shake 0.4s; color: var(--warn); }
+
+/* --- MODALS & OVERLAYS --- */
+.modal-overlay{position:fixed; inset:0; background:rgba(10, 15, 31, 0.85); z-index:900; display:none; place-items:center; opacity:0; transition:opacity 0.2s;}
+.modal-overlay.open{display:grid; opacity:1;}
+.modal{background:#1e293b; width:90%; max-width:600px; border-radius:16px; padding:24px; border:1px solid #475569; transform:scale(0.95); transition:transform 0.3s var(--ease-out); box-shadow: 0 20px 50px rgba(0,0,0,0.5); position:relative;}
+.modal-overlay.open .modal{transform:scale(1);}
+
+#analystNotebook {
+  position: fixed; right: -340px; top: 80px; width: 320px; height: 500px;
+  background: #0b1224; border: 1px solid var(--b); border-right: none;
+  border-radius: 12px 0 0 12px; padding: 16px; transition: right 0.3s var(--ease-out);
+  z-index: 800; box-shadow: -10px 10px 30px rgba(0,0,0,0.5); display: flex; flex-direction: column;
+}
+#analystNotebook.open { right: 0; }
+#notebookLogContainer { flex: 1; overflow-y: auto; font-size: 13px; white-space: pre-wrap; color: var(--mut); line-height: 1.5; font-family: monospace; }
+#notebookReference { height: 180px; border-top: 1px solid #334155; padding-top: 10px; margin-top: 10px; font-size: 12px; overflow-y: auto; }
+.ref-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dashed #26365f; color: var(--mut); }
+.ref-row b { color: var(--acc); }
+
+.log-entry { margin-bottom: 8px; border-bottom: 1px dashed #334155; padding-bottom: 4px; }
+.log-ts { color: var(--acc); font-weight: 700; font-size: 11px; margin-right: 6px; }
+
+.toast{position:fixed; top:90px; right:20px; background:#1e293b; border-left:4px solid var(--acc); padding:16px; border-radius:10px; box-shadow: 0 10px 30px rgba(0,0,0,0.4); z-index:2000; transform:translateX(120%); transition:transform 0.4s var(--ease-out); font-weight: 500; max-width: 300px; border: 1px solid #334155;}
+.toast.show{transform:translateX(0);}
+.toast b { display: block; margin-bottom: 4px; color: var(--fg); }
+
+/* --- TUTORIAL OVERLAY (Standard) --- */
+/* CRITICAL FIX: Hide the old tutorial overlay completely so it never overlaps */
+#tutorialOverlay { display: none !important; }
+
+@media (max-width:760px){.grid2{grid-template-columns:1fr}}
+
+/* === NINTENDO-STYLE GUIDE (STRICT MODAL ARCHITECTURE) === */
+
+/* Layer 1: Veil (Backdrop) - Blocks clicks */
+.retro-veil {
+  position: fixed; inset: 0; 
+  background: rgba(2, 6, 23, 0.85); 
+  backdrop-filter: blur(4px);
+  display: none; 
+  z-index: 10000; /* Nuclear Z-Index */
+  pointer-events: auto;
+}
+.retro-veil.active { display: flex; }
+
+/* Layer 2: Highlighted Element (Punches through veil) */
+.retro-pop-up {
+  position: relative !important; 
+  z-index: 10005 !important; /* Above Veil */
+  background: #0f172a; 
+  border-radius: 12px;
+  /* Glow effect replaced the static border */
+  animation: retro-glow 2s infinite ease-in-out;
+  transition: none;
+}
+.retro-lift { 
+    z-index: 10005 !important; 
+    position: relative !important; 
+    transform: none !important; 
+}
+
+/* Layer 3: The Message Box */
+.retro-box {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  max-width: 450px; width: calc(100% - 32px);
+  background: var(--nin-white);
+  border-radius: 18px;
+  border: 4px solid var(--nin-blue);
+  padding: 20px 24px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.9);
+  color: #1e293b; 
+  display: none; flex-direction: column; gap: 12px;
+  z-index: 10010; /* Above target element */
+  font-family: "Inter", sans-serif;
+  animation: boxPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transition: top 0.3s ease, bottom 0.3s ease;
+}
+@keyframes boxPop { from { transform: translate(-50%, 20px) scale(0.9); opacity: 0; } to { opacity: 1; } }
+
+/* Box Positioning Classes */
+.retro-box.center { top: 50%; transform: translate(-50%, -50%); display: flex; }
+/* Modified spacing for better breathing room */
+.retro-box.top    { top: 100px; display: flex; } 
+.retro-box.bottom { bottom: 60px; display: flex; }
+
+/* MOBILE ADJUSTMENTS */
+@media (max-width: 600px) {
+  .retro-box.top { top: 70px; }
+  .retro-box.bottom { bottom: 20px; }
+  .retro-hand { font-size: 40px !important; }
+}
+
+.retro-title {
+    font-size: 16px; font-weight: 800; color: var(--nin-blue); text-transform: uppercase; letter-spacing: 0.5px;
+    display: flex; align-items: center; gap: 8px;
+}
+.retro-text { font-size: 15px; line-height: 1.6; font-weight: 500; color: #334155; }
+
+.retro-btn {
+  font-family: "Inter", sans-serif; font-size: 13px; font-weight: 700;
+  padding: 8px 16px; border-radius: 20px; border: none; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+  box-shadow: 0 3px 0 rgba(0,0,0,0.2); transition: transform 0.1s, box-shadow 0.1s;
+}
+.retro-btn:active { transform: translateY(3px); box-shadow: none; }
+
+.retro-btn.next { background: var(--nin-green); color: #052e16; border: 2px solid #16a34a; }
+.retro-btn.skip { 
+    position: absolute !important; top: -12px; right: -12px; margin: 0; 
+    width: 32px; height: 32px; padding: 0; justify-content: center;
+    background: var(--nin-red); color: white; border: 2px solid #b91c1c; border-radius: 50%;
+    font-size: 16px; z-index: 10;
+}
+.retro-btn.disable { 
+    background: #334155; color: #cbd5e1; border: 2px solid #94a3b8; width: 100%; justify-content: center; margin-top: 8px; font-size: 12px;
+}
+.retro-btn.disable:hover { background: #475569; color: white; }
+
+/* Layer 4: The Hand (Child of Box, but visually breaks out) */
+.retro-hand {
+  position: absolute; 
+  /* Z-Index higher than box content to sit ON TOP of text if overlapping */
+  z-index: 10020; 
+  font-size: 54px; /* Slightly bigger */
+  pointer-events: none;
+  transform: translateX(-50%); 
+  display: none; 
+  filter: drop-shadow(0 4px 6px rgba(0,0,0,0.4)); /* Added shadow for depth */
+  transition: left 0.3s ease;
+  left: 50%; /* Default center */
+}
+
+/* Spotlight rectangle that highlights the current target */
+.retro-spotlight {
+  position: absolute;
+  border-radius: 14px;
+  box-shadow: 0 0 0 9999px rgba(2, 6, 23, 0.85);
+  border: 3px solid var(--nin-yellow);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  z-index: 10002;
+}
+.retro-spotlight.active {
+  opacity: 1;
+}
+
+/* Animations */
+@keyframes retro-hand-down { 0% { transform: translate(-50%, -6px); } 100% { transform: translate(-50%, 6px); } }
+@keyframes retro-hand-up { 0% { transform: translate(-50%, 6px); } 100% { transform: translate(-50%, -6px); } }
+.retro-hand.animate-down { animation: retro-hand-down 0.8s ease-in-out infinite alternate; }
+.retro-hand.animate-up { animation: retro-hand-up 0.8s ease-in-out infinite alternate; }
+
+@keyframes retro-glow {
+  0% { box-shadow: 0 0 0 4px var(--nin-yellow), 0 0 10px var(--nin-yellow); }
+  50% { box-shadow: 0 0 0 4px var(--nin-yellow), 0 0 25px var(--nin-yellow); }
+  100% { box-shadow: 0 0 0 4px var(--nin-yellow), 0 0 10px var(--nin-yellow); }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="hdr">
+    <div>
+      <h1>Forensic Sim <span style="font-size:0.6em; opacity:0.7; vertical-align:middle;">Ninty Edition</span></h1>
+    </div>
+    <div class="kpis">
+      <div class="kpi clickable-kpi" id="credWidget" title="Click for info" onclick="showExplanation('credibility', event)">❤️ Cred: <span id="credDisplay">100</span>%</div>
+      <div class="kpi" id="xpWidget">⭐ XP: <span id="xpDisplay">0</span></div>
+      <div class="kpi">🏆 <span id="titleDisplay">Rookie</span></div>
+      <div class="kpi">🔥 Streak: <span id="streakDisplay">0</span></div>
+      <div class="kpi">
+          <select id="diffSel" class="btn sm" style="padding:2px 4px; height: 24px; font-size:11px;" onchange="setDifficulty(this.value)">
+              <option value="1">Normal</option>
+              <option value="1.5">Hard Mode</option>
+          </select>
+      </div>
+      <button class="btn sm" id="notebookToggle">📓 Notebook</button>
+      <button class="btn sm" id="mathToggle">📊 Stats View</button>
+      <button class="btn sm" id="theoryBtn">📘 Theory</button>
+      <button class="btn sm" id="helpBtn">🍄 Guide</button>
+    </div>
+  </div>
+
+  <div id="tutorialOverlay">
+    <!-- Old tutorial structure preserved but hidden by CSS !important -->
+    <section id="tutorialView" class="card">
+      <div id="tutContent"></div>
+      <div class="tut-nav">
+        <button class="btn sm" id="tutSkip">Skip</button>
+        <button class="btn primary" id="tutNext">Next</button>
+      </div>
+    </section>
+  </div>
+
+  <section id="cabinetView" class="card hidden">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <div>
+        <h3>Case File Cabinet 🗄️</h3>
+        <div class="mut">Select a case to begin your analysis.</div>
+      </div>
+      <button class="btn sm" onclick="fullReset()">🔄 Reset All</button>
+    </div>
+    <div class="board" id="caseGrid"></div>
+  </section>
+
+  <section id="guidedView" class="card hidden">
+    <div style="display:flex; justify-content:space-between;">
+      <h3>Training: The Blood Stain Example 🩸</h3>
+      <button class="btn sm" onclick="renderCabinet()">Exit</button>
+    </div>
+    <div class="soft" style="margin: 16px 0;">
+      <p class="mut"><b>Scenario:</b> A crime stain is found. A suspect is arrested. Both stain and suspect are blood type X1. Population frequency: <b>0.01</b>.</p>
+      <p class="mut"><b>Propositions:</b> <br>C: From suspect. <br>C̅: From unknown person.</p>
+    </div>
+    <div id="guidedSteps">
+      <div class="soft" style="margin-bottom:12px;">
+        <h4 style="margin-bottom:8px;">1. Numerator: P(E|C) <button class="btn info-btn" onclick="showExplanation('numerator')">ℹ️</button></h4>
+        <div style="display:flex; align-items:center; gap: 8px;">
+           P(E|C) = <input id="g-num-input" class="calc-input" placeholder="?" type="text">
+           <span id="g-num-fb" class="feedback"></span>
+        </div>
+      </div>
+      <div class="soft hidden" id="g-step2" style="margin-bottom:12px;">
+        <h4 style="margin-bottom:8px;">2. Denominator: P(E|C̅) <button class="btn info-btn" onclick="showExplanation('denominator')">ℹ️</button></h4>
+        <div style="display:flex; align-items:center; gap: 8px;">
+           P(E|C̅) = <input id="g-den-input" class="calc-input" placeholder="?" type="text">
+           <span id="g-den-fb" class="feedback"></span>
+        </div>
+      </div>
+      <div class="soft hidden" id="g-step3" style="margin-bottom:12px;">
+        <h4 style="margin-bottom:8px;">3. Likelihood Ratio <button class="btn info-btn" onclick="showExplanation('lr')">ℹ️</button></h4>
+        <div style="display:flex; align-items:center; gap: 8px;">
+           LR = 1 / 0.01 = <input id="g-lr-input" class="calc-input" placeholder="?" type="text">
+           <span id="g-lr-fb" class="feedback"></span>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:20px; text-align:right;">
+      <button id="guidedFinishBtn" class="btn primary hidden" onclick="finishGuided()">Complete Training 🎓</button>
+    </div>
+  </section>
+
+  <section id="briefingView" class="hidden">
+      <div class="briefing-box">
+          <div style="font-size: 48px; margin-bottom: 12px;" id="briefingIcon"></div>
+          <h2 id="briefingTitle" style="margin-bottom: 16px; font-size: 24px;"></h2>
+          <div class="soft" style="text-align: left; margin-bottom: 24px; font-size: 16px; line-height: 1.6;">
+              <div style="color: var(--acc); font-weight: 800; margin-bottom: 4px;">CASE SCENARIO:</div>
+              <span id="briefingScenario"></span>
+              <div style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed #334155;">
+                 <span style="color: var(--warn); font-weight: 800;">DEFENCE STATEMENT:</span>
+                 <span id="briefingDefence" style="font-style: italic; color: #fca5a5;"></span>
+              </div>
+          </div>
+          <div style="display: flex; gap: 12px; justify-content: center;">
+              <button class="btn" onclick="renderCabinet()">Cancel</button>
+              <button class="btn primary" onclick="startAnalysis()">Start Analysis 🚀</button>
+          </div>
+      </div>
+  </section>
+
+  <section id="flowView" class="hidden">
+    <div class="card" style="display:flex; justify-content:space-between; align-items:center; padding:12px 20px; border-left: 6px solid var(--acc);">
+      <div>
+        <h4 style="margin:0;"><span id="caseIcon" style="margin-right:8px;"></span><span id="caseName"></span></h4>
+        <div class="mut" style="font-size:12px;">Scenario active.</div>
+      </div>
+      <div style="text-align:right;">
+        <span id="caseTypeDisplay" class="hierarchy-badge"></span>
+        <button class="btn sm" onclick="renderCabinet()" style="margin-left: 8px;">Exit</button>
+      </div>
+    </div>
+
+    <div id="step1" class="card">
+      <h3>1. Establish Propositions 🧩</h3>
+      <div id="step1_phase1">
+          <div class="soft" style="margin: 16px 0; border-left: 4px solid #fbbf24;">
+              <b>Strategic Decision:</b><br>
+              Check the <span style="color:var(--warn)">Defence Statement</span>. Is the suspect admitting presence?
+          </div>
+          <div class="decision-box">
+              <div class="level-card" onclick="chooseLevel('source')">
+                  <div class="level-title" style="color:var(--source-tint);">Source Level <button class="btn info-btn" onclick="showExplanation('source_level', event)">ℹ️</button></div>
+                  <div class="level-desc">Dispute: "I wasn't there."<br>Task: Prove the material is from the suspect.</div>
+              </div>
+              <div class="level-card" onclick="chooseLevel('activity')">
+                  <div class="level-title" style="color:var(--activity-tint);">Activity Level <button class="btn info-btn" onclick="showExplanation('activity_level', event)">ℹ️</button></div>
+                  <div class="level-desc">Dispute: "I was there innocently."<br>Task: Prove the activity (how it got there).</div>
+              </div>
+          </div>
+      </div>
+      <div id="step1_phase2" class="hidden">
+          <div class="mut" style="margin: 16px 0;">Build <b>C</b> and <b>C̅</b> using the fragments below.</div>
+          <div class="slot-container">
+            <div class="slot-label" style="color:var(--acc);">Proposition C (Prosecution)</div>
+            <div id="slotC" class="sentence-slot active" onclick="setActiveSlot('C')"></div>
+          </div>
+          <div class="slot-container">
+            <div class="slot-label" style="color:var(--warn);">Proposition C̅ (Defence)</div>
+            <div id="slotCb" class="sentence-slot" onclick="setActiveSlot('Cb')"></div>
+          </div>
+          <div class="bank-container">
+            <div class="bank-section source">
+              <div class="bank-label source">Source Fragments (Purple)</div>
+              <div id="bankSource" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+            </div>
+            <div class="bank-section activity">
+              <div class="bank-label activity">Activity Fragments (Yellow)</div>
+              <div id="bankActivity" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+            </div>
+          </div>
+          <div style="display:flex; justify-content:space-between; margin-top:20px; align-items:center;">
+            <div>
+              <button class="btn" onclick="clearSlots()">🗑️ Clear</button>
+              <button class="btn" id="btnReveal" style="margin-left: 8px; border-bottom-color: var(--warn);">👀 Reveal (-20 Cred)</button>
+            </div>
+            <button class="btn primary" id="btnSubmitProp">Check Logic ✅</button>
+          </div>
+      </div>
+    </div>
+
+    <div id="step2" class="card hidden">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h3>2. Evaluate Evidence Strength 🎛️ <button class="btn info-btn" onclick="showExplanation('lr', event)">ℹ️ Info</button></h3>
+      </div>
+      <div class="mut" style="margin: 8px 0;">How rare is this evidence in the general population?</div>
+      
+      <div class="soft" style="margin-top: 15px; background: #080c18; padding: 20px;">
+        <div class="fraction-wrap">
+          <div style="display:flex; flex-direction:column; width: 140px; align-items: center;">
+            <span class="frac-num">Certainty (1.0)<br><span style="font-size:10px; color:var(--mut)">(P. wants to see matches)</span></span>
+            <div class="frac-line"></div>
+            <span class="frac-den">Coincidence (<span id="denomDisplay">0.5</span>)<br><span style="font-size:10px; color:var(--mut)">(Match by Chance)</span></span>
+          </div>
+          <div class="eq-sign">=</div>
+          <div class="lr-result" id="dynamicLR">1</div>
+        </div>
+        <div style="text-align:center; font-size: 12px; color: var(--mut); margin-top: 4px; text-transform: uppercase; font-weight: 700;">Likelihood Ratio (Strength)</div>
+      </div>
+
+      <div class="intuition-box" id="intuitionBox"></div>
+
+      <div style="margin: 24px 0;">
+        <label style="font-size:13px; font-weight:700; color:var(--warn); text-transform: uppercase;">Rarity Scanner:</label>
+        <input type="range" id="raritySlider" min="1" max="100" value="1" style="width:100%;">
+        <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:700; color: var(--mut);">
+          <span>Common (1 in 2)</span>
+          <span id="rarityText" style="color:var(--warn); font-size: 14px;">1 in 2</span>
+          <span>Rare (1 in 100)</span>
+        </div>
+      </div>
+
+      <div style="text-align:center; font-size:11px; color:var(--mut); margin-bottom:4px; font-weight:700;">POPULATION MATCHES (<span id="matchCountDisplay">50</span>/100)</div>
+      <div class="pop-grid" id="popGrid"></div>
+
+      <div style="text-align:right; margin-top:20px;">
+        <button class="btn primary" id="btnLockEval">Lock LR & Continue 🔒</button>
+      </div>
+    </div>
+
+    <div id="step3" class="card hidden">
+      <div style="display:flex; justify-content:space-between;">
+        <h3>3. Neutralize the Report 🖊️ <button class="btn info-btn" style="font-size:14px; padding:2px 8px;" onclick="showExplanation('fallacy', event)">ℹ️ Info</button></h3>
+      </div>
+      
+      <div id="verbalPhase">
+          <div class="mut" style="margin:16px 0;">Based on your LR, which verbal scale classification is correct?</div>
+          <div id="verbalOptions" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;"></div>
+      </div>
+
+      <div id="redPenPhase" class="hidden">
+          <div class="mut" style="margin:16px 0;">The draft below contains the <b>Prosecutor's Fallacy</b>. Click the <span style="color:var(--warn); font-weight:bold;">red words</span> to fix them.</div>
+          <div class="soft editor-box" id="editorContent"></div>
+          <div style="text-align:right; margin-top:20px;">
+            <button class="btn primary" id="btnFinalSubmit" disabled>Submit to Court ⚖️</button>
+          </div>
+      </div>
+    </div>
+
+    <div id="stepSummary" class="card hidden">
+      <h2 style="margin-bottom:20px; text-align:center;">Case Closed! 🎉</h2>
+      <div class="grid2">
+          <div class="soft">
+              <h4 style="margin-top:0;">Performance</h4>
+              <div class="mut" style="line-height:1.8;">
+                  XP Earned: <b style="color:var(--ok)" id="finalXPDisplay">+0</b><br>
+                  Final Credibility: <b id="finalCredDisplay">100%</b><br>
+                  Evidence Strength (LR): <b id="finalLRDisplay" style="color:var(--acc)">0</b>
+              </div>
+              <div class="mut" style="margin-top:12px; font-size:12px; border-top:1px dashed var(--b); padding-top:8px;" id="verbalFinalExplanation"></div>
+          </div>
+          <div class="soft">
+              <h4 style="margin-top:0; display:flex; justify-content:space-between;">
+                  Scales of Justice
+                  <button class="btn sm" onclick="showExplanation('scales', event)">ℹ️</button>
+              </h4>
+              <div class="mut" style="margin-bottom:8px;">Adjust Court's Prior Belief:</div>
+              <select id="priorSel" class="btn" style="width:100%; font-size:13px; margin-bottom:20px;">
+                <option value="leansCb">Skeptical Jury (Leans Defense 1:10)</option>
+                <option value="balanced" selected>Neutral Jury (Balanced 1:1)</option>
+                <option value="leansC">Biased Jury (Leans Prosecution 10:1)</option>
+              </select>
+              
+              <div class="scale-wrap">
+                  <div class="scale-bar" id="scaleBar">
+                      <div class="scale-marker" id="mEvidence">LR</div>
+                  </div>
+                  <div class="scale-fulcrum"></div>
+                  <div class="scale-labels">
+                      <span>Def</span>
+                      <span>Neutral</span>
+                      <span>Pros</span>
+                  </div>
+              </div>
+          </div>
+      </div>
+      <div style="text-align:center; margin-top:24px;">
+          <button class="btn primary" onclick="renderCabinet()">Back to Cabinet ➡</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="analystNotebook">
+    <button class="close-btn" onclick="$('analystNotebook').classList.remove('open')">&times;</button>
+    <h3 style="margin-top:0;">Analyst's Notebook 📓</h3>
+    <div class="mut" style="margin-bottom:10px; font-size:11px;">Session Log:</div>
+    <div id="notebookLogContainer"></div>
+    <div id="notebookReference"></div>
+</div>
+
+<div id="mathOverlay" class="math-overlay">
+    <button class="close-btn" onclick="$('mathOverlay').classList.remove('visible')">&times;</button>
+    <h5>Stats Engine 📊</h5>
+    <div class="math-row"><span>P(E|C):</span> <span class="math-val" id="mathPEC">1.0</span></div>
+    <div class="math-row"><span>P(E|C̅):</span> <span class="math-val" id="mathPECBar">?</span></div>
+    <hr style="border: 0; border-top: 1px solid #334155; margin: 8px 0;">
+    <div class="math-row" style="font-weight:700"><span>LR:</span> <span class="math-val" style="font-size:16px;" id="mathLR">?</span></div>
+    <div class="mut" style="font-size:11px; margin-top:8px; line-height:1.2; border-top: 1px dashed #334155; padding-top: 6px;">
+        Formula: LR = P(E|C) / P(E|C̅)<br>
+        <i>Updates dynamically with dial.</i>
+    </div>
+</div>
+
+<div id="toast" class="toast"></div>
+<div id="ctxMenu" class="correction-menu hidden"></div>
+<div id="modalOverlay" class="modal-overlay">
+  <div class="modal">
+    <button class="close-btn" onclick="closeModal()">&times;</button>
+    <h3 id="modalTitle">Info</h3>
+    <div id="modalBody" class="mut" style="margin:16px 0;"></div>
+    <div style="text-align: right;" id="modalFooter"><button class="btn primary" onclick="closeModal()">Got it</button></div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const toast = (msg, type='neutral') => {
+  const t = $('toast'); t.innerHTML = `<button class="close-toast" onclick="this.parentElement.classList.remove('show')">&times;</button><b>${msg}</b>`;
+  t.style.borderLeftColor = type === 'good' ? 'var(--ok)' : type === 'bad' ? 'var(--warn)' : 'var(--acc)';
+  t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3500);
+};
+const showTransientInsight = (title, msg) => {
+  const t = $('toast'); t.innerHTML = `<button class="close-toast" onclick="this.parentElement.classList.remove('show')">&times;</button><b>${title}</b><div class="mut">${msg}</div>`;
+  t.style.borderLeftColor = 'var(--acc)'; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 6000);
+};
+
+const CONFIG = {
+  levels: { rookie: 0, analyst: 500, expert: 1500, master: 3000 },
+  lrThresholds: [
+    {val: 1, label: "No support"}, {val: 10, label: "Weak support"}, {val: 100, label: "Moderate support"},
+    {val: 1000, label: "Strong support"}, {val: 10000, label: "Very strong support"}
+  ],
+  explanations: {
+      'numerator': "<b>P(E|C): Conditional Probability (Numerator)</b><br>The probability of observing the evidence (E) GIVEN that the prosecution's proposition (C) is true.<br>Example: If the DNA is from the suspect, we expect a match (Prob ≈ 1).",
+      'denominator': "<b>P(E|C̅): Conditional Probability (Denominator)</b><br>The probability of observing the evidence (E) GIVEN that the defence's proposition (C̅) is true.<br>Example: If the DNA is from a random person, what are the odds? This is the Random Match Probability.",
+      'lr': "<b>Likelihood Ratio (LR)</b><br>A measure of strength derived from Bayes' Theorem. <br>Formula: <code>LR = P(E|C) / P(E|C̅)</code><br>It tells us how many times more likely the evidence is under the prosecution view compared to the defence view.",
+      'source_level': "<b>Source Level Proposition</b><br>Addresses: <i>'Where did this material come from?'</i><br><b>When to use:</b> When the suspect denies any association with the material (e.g., 'I wasn't there', 'That's not my DNA').",
+      'activity_level': "<b>Activity Level Proposition</b><br>Addresses: <i>'How did this material get here?'</i><br><b>When to use:</b> When the suspect admits the source/association but provides an innocent explanation (e.g., 'I was there, but I didn't smash the window').",
+      'fallacy': "<b>The Prosecutor's Fallacy</b><br>A common logical error where the probability of the evidence given guilt is confused with the probability of guilt given the evidence.<br><b>Correct:</b> 'The evidence provides strong support for the proposition that the suspect is the source.'<br><b>Wrong:</b> 'The evidence proves the suspect is the source (99% probability).'",
+      'scales': "<b>Bayes' Theorem Visualization</b><br>The scales show how your evidence (LR) updates the Court's prior belief.<br><b>Posterior Odds = Prior Odds × LR</b>.<br>Even with a biased jury (Prior), strong scientific evidence (High LR) can tilt the scales.",
+      'credibility': "<b>Your Credibility Score</b><br>This represents your professional standing in the court. You lose credibility when you make logical errors, attempt to guess answers, or use biased language.<br><br><b>If it hits 0%, your case is thrown out and you must retrain.</b>"
+  }
+};
+
+const CASES = [
+  {
+    id: 'glass', icon: '🪟', title: 'Smashed Window', type: 'source', tag: 'Glass',
+    scenario: "Shop window smashed. Glass fragments found on suspect's jacket. RI matches window.",
+    defence: "I wasn't anywhere near that shop. I was at home.",
+    fragments: [{t:"[The glass fragments]",type:'source'},{t:"[came from]",type:'source'},{t:"[the broken window]",type:'source'},{t:"[an unrelated source]",type:'source'},{t:"[The suspect]",type:'activity'},{t:"[smashed]",type:'activity'},{t:"[the window]",type:'activity'},{t:"[was a bystander]",type:'activity'}],
+    requiredC: ["[The glass fragments]","[came from]","[the broken window]"], requiredCb: ["[The glass fragments]","[came from]","[an unrelated source]"],
+    badDraft: "The refractive index match [proves] that the suspect [smashed] the window.",
+    fixes: {'[proves]':{correct:'supports the proposition',options:['proves','supports the proposition','shows']},'[smashed]':{correct:'is the source of the glass from',options:['is guilty','smashed','is the source of the glass from']}}
+  },
+  {
+    id: 'dna', icon: '🧬', title: 'DNA Under Fingernails', type: 'source', tag: 'DNA',
+    scenario: "Assault with scratching. DNA profile under victim's fingernails matches suspect.",
+    defence: "I've never met this person. I wasn't there.",
+    fragments: [{t:"[The DNA]",type:'source'},{t:"[was left by]",type:'source'},{t:"[the suspect]",type:'source'},{t:"[an unknown person]",type:'source'},{t:"[The suspect]",type:'activity'},{t:"[assaulted]",type:'activity'},{t:"[the victim]",type:'activity'},{t:"[was elsewhere]",type:'activity'}],
+    requiredC: ["[The DNA]","[was left by]","[the suspect]"], requiredCb: ["[The DNA]","[was left by]","[an unknown person]"],
+    badDraft: "The DNA profile match [confirms] that the suspect [assaulted] the victim.",
+    fixes: {'[confirms]':{correct:'provides extremely strong support for the view',options:['confirms','provides extremely strong support for the view','proves']},'[assaulted]':{correct:'is the source of the DNA found on',options:['assaulted','is the attacker','is the source of the DNA found on']}}
+  },
+  {
+    id: 'fibre_rare', icon: '🧵', title: 'Rare Carpet Fibre', type: 'activity', tag: 'Fibres',
+    scenario: "Rare red fibres found on suspect's trousers match victim's rug.",
+    defence: "I own those trousers. I visited the victim yesterday and sat on that rug, but I didn't attack them.",
+    fragments: [{t:"[The suspect]",type:'activity'},{t:"[transferred fibres]",type:'activity'},{t:"[during the assault]",type:'activity'},{t:"[during a social visit]",type:'activity'},{t:"[The fibres]",type:'source'},{t:"[originated from]",type:'source'},{t:"[the rug]",type:'source'},{t:"[another rug]",type:'source'}],
+    requiredC: ["[The suspect]","[transferred fibres]","[during the assault]"], requiredCb: ["[The suspect]","[transferred fibres]","[during a social visit]"],
+    badDraft: "The rare fibres [prove] that the suspect [grappled with] the victim.",
+    fixes: {'[prove]':{correct:'support the view',options:['prove','support the view','reveal']},'[grappled with]':{correct:'was in recent contact with',options:['is guilty','grappled with','was in recent contact with']}}
+  },
+  {
+    id: 'fibre_common', icon: '👕', title: 'Common Blue Cotton', type: 'activity', tag: 'Fibres',
+    scenario: "Common blue cotton fibres on victim. Suspect admits being in park but denies contact.",
+    defence: "I walk in that park daily. I didn't touch them. My jacket is common denim.",
+    fragments: [{t:"[The suspect]",type:'activity'},{t:"[had physical contact with]",type:'activity'},{t:"[the victim]",type:'activity'},{t:"[had no contact with]",type:'activity'},{t:"[The fibres]",type:'source'},{t:"[match]",type:'source'},{t:"[the jacket]",type:'source'},{t:"[another jacket]",type:'source'}],
+    requiredC: ["[The suspect]","[had physical contact with]","[the victim]"], requiredCb: ["[The suspect]","[had no contact with]","[the victim]"],
+    badDraft: "The common fibres [mean] that the suspect [strangled] the victim.",
+    fixes: {'[mean]':{correct:'provide limited support for the view',options:['mean','prove','provide limited support for the view']},'[strangled]':{correct:'was in contact with',options:['is the attacker','is guilty','was in contact with']}}
+  }
+];
+
+let state = { xp: 0, sessionStartXP: 0, streak: 0, cred: 100, difficulty: 1, activeCase: null, activeSlot: 'C', propC: [], propCb: [], lrValue: 1, fixedWords: 0, tutStep: 0, verbalBand: '' };
+
+function init() {
+  const savedXP = localStorage.getItem('fs_xp');
+  if(savedXP) state.xp = parseInt(savedXP);
+  state.sessionStartXP = state.xp; 
+  updateStats();
+  populateNotebook(); 
+  
+  if(!localStorage.getItem('fs_tut_seen')) {
+      localStorage.setItem('fs_tut_seen', 'true');
+      renderCabinet();
+      setTimeout(window.askToStartGuide, 500);
+  } else {
+      renderCabinet();
+  }
+}
+
+function updateStats() {
+  if($('xpDisplay')) $('xpDisplay').innerText = state.xp;
+  if($('credDisplay')) $('credDisplay').innerText = state.cred;
+  if($('streakDisplay')) $('streakDisplay').innerText = state.streak;
+  
+  let title = "Rookie";
+  let limit = CONFIG.levels.analyst;
+  if(state.xp >= CONFIG.levels.analyst) { title = "Analyst"; limit = CONFIG.levels.expert; }
+  if(state.xp >= CONFIG.levels.expert) { title = "Expert"; limit = CONFIG.levels.master; }
+  if($('titleDisplay')) $('titleDisplay').innerText = `${title} [${state.xp}/${limit}]`;
+  
+  localStorage.setItem('fs_xp', state.xp);
+}
+
+function setDifficulty(val) {
+    state.difficulty = parseFloat(val);
+    toast(`Difficulty set to ${state.difficulty === 1 ? 'Normal' : 'Hard'}`, 'neutral');
+}
+
+function spawnFloater(id, text, color) {
+    const el = $(id);
+    const float = document.createElement('div');
+    float.className = 'floater';
+    float.innerText = text;
+    float.style.color = color;
+    el.appendChild(float);
+    setTimeout(() => float.remove(), 1000);
+}
+
+function logToNotebook(msg) {
+    const nb = $('notebookLogContainer');
+    const d = new Date();
+    const time = `${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}`;
+    const div = document.createElement('div');
+    div.className = 'log-entry';
+    div.innerHTML = `<span class="log-ts">${time}</span> ${msg}`;
+    nb.prepend(div); 
+}
+
+function populateNotebook() {
+  const ref = $('notebookReference');
+  ref.innerHTML = "<div style='font-weight:700; color:var(--acc); margin-bottom:6px;'>Verbal Scale Reference:</div>";
+  CONFIG.lrThresholds.forEach(t => {
+      const div = document.createElement('div');
+      div.className = 'ref-row';
+      div.innerHTML = `<span>> ${t.val}</span> <b>${t.label}</b>`;
+      ref.appendChild(div);
+  });
+}
+
+function punish(amt, msg) {
+    const finalAmt = Math.round(amt * state.difficulty);
+    state.cred -= finalAmt;
+    if(state.cred <= 0) {
+        state.cred = 0; updateStats();
+        setTimeout(() => { alert("GAME OVER: Retraining required."); localStorage.clear(); location.reload(); }, 100);
+        return;
+    }
+    updateStats();
+    spawnFloater('credWidget', `-${finalAmt}`, 'var(--warn)');
+    logToNotebook(`ERROR: ${msg} (-${finalAmt} Cred)`);
+    toast(`Supervisor: ${msg} (-${finalAmt} Cred)`, 'bad');
+    const c = $('credWidget');
+    c.classList.remove('score-drop'); void c.offsetWidth; c.classList.add('score-drop');
+}
+
+function reward(xp, msg) {
+    let finalXP = xp;
+    if(state.difficulty > 1) finalXP = Math.round(xp * 0.8); 
+    state.xp += finalXP;
+    updateStats();
+    spawnFloater('xpWidget', `+${finalXP}`, 'var(--ok)');
+    logToNotebook(`SUCCESS: ${msg} (+${finalXP} XP)`);
+}
+
+// GUIDED CASE
+function startGuided() { $('cabinetView').classList.add('hidden'); $('guidedView').classList.remove('hidden'); }
+$('g-num-input').oninput = (e) => { if(e.target.value === '1') { $('g-num-fb').innerText = "✅ Correct!"; $('g-num-fb').className="feedback good"; $('g-step2').classList.remove('hidden'); } };
+$('g-den-input').oninput = (e) => { if(e.target.value === '0.01') { $('g-den-fb').innerText = "✅ Correct!"; $('g-den-fb').className="feedback good"; $('g-step3').classList.remove('hidden'); } };
+$('g-lr-input').oninput = (e) => { if(e.target.value === '100') { $('g-lr-fb').innerText = "✅ Perfect!"; $('g-lr-fb').className="feedback good"; $('guidedFinishBtn').classList.remove('hidden'); } };
+function finishGuided() { reward(50, "Completed Blood Stain Training"); renderCabinet(); toast("Training Complete! +50 XP", "good"); }
+
+// CABINET
+function renderCabinet() {
+  ['tutorialView','flowView','briefingView','guidedView','stepSummary'].forEach(v=> { if($(v)) $(v).classList.add('hidden') });
+  $('cabinetView').classList.remove('hidden');
+  const grid = $('caseGrid'); grid.innerHTML = '';
+  const train = document.createElement('div'); train.className = 'tile'; train.style.borderTopColor = 'var(--ok)';
+  train.innerHTML = `<div class="tile-icon">🎓</div><div class="tile-title">Training: Blood Stain</div>`;
+  train.onclick = startGuided; grid.appendChild(train);
+  CASES.forEach((c, idx) => {
+    const el = document.createElement('div'); el.className = 'tile';
+    el.innerHTML = `<div class="tile-icon">${c.icon}</div><div class="tile-title">${c.title}</div><div class="tile-tag">${c.tag}</div>`;
+    el.onclick = () => showBriefing(idx); grid.appendChild(el);
+  });
+}
+
+function showBriefing(idx) {
+    state.activeCase = CASES[idx];
+    $('cabinetView').classList.add('hidden'); $('briefingView').classList.remove('hidden');
+    $('briefingIcon').innerText = state.activeCase.icon; $('briefingTitle').innerText = state.activeCase.title;
+    $('briefingScenario').innerText = state.activeCase.scenario; $('briefingDefence').innerText = `"${state.activeCase.defence}"`;
+    
+    // AUTO-START GUIDE FOR BRIEFING (only if user opted in)
+    if (guideShouldAutoStart()) {
+        setTimeout(window.startRetroGuide, 500);
+    }
+}
+
+function startAnalysis() {
+    $('briefingView').classList.add('hidden'); $('flowView').classList.remove('hidden');
+    state.propC = []; state.propCb = []; state.fixedWords = 0;
+    $('caseIcon').innerText = state.activeCase.icon; $('caseName').innerText = state.activeCase.title;
+    $('step1').classList.remove('hidden'); $('step1_phase1').classList.remove('hidden'); $('step1_phase2').classList.add('hidden');
+    $('step2').classList.add('hidden'); $('step3').classList.add('hidden'); $('stepSummary').classList.add('hidden');
+    $('btnReveal').onclick = revealPropositions; $('btnSubmitProp').onclick = checkPropLogic;
+    logToNotebook(`Started Case: ${state.activeCase.title}`);
+    
+    // AUTO-START GUIDE FOR ANALYSIS (only if user opted in)
+    if (guideShouldAutoStart()) {
+        setTimeout(window.startRetroGuide, 500);
+    }
+}
+
+// STEP 1
+function chooseLevel(choice) {
+    if (choice === state.activeCase.type) {
+        reward(15, "Correct Proposition Strategy");
+        showTransientInsight("Strategic Choice Correct 🎯", `Moving to proposition building.`);
+        $('step1_phase1').classList.add('hidden'); $('step1_phase2').classList.remove('hidden');
+        setupBuilder();
+    } else {
+        punish(15, state.activeCase.type==='activity' ? "Suspect admits source! Prove activity." : "Suspect denies presence! Prove source.");
+    }
+}
+function setupBuilder() {
+    $('bankSource').innerHTML = ''; $('bankActivity').innerHTML = ''; renderSlots();
+    state.activeCase.fragments.forEach(frag => {
+        const t = document.createElement('div'); t.className = `word-tile ${frag.type}-tile`;
+        t.innerText = frag.t; t.onclick = () => addFragment(frag.t);
+        if(frag.type === 'source') $('bankSource').appendChild(t); else $('bankActivity').appendChild(t);
+    });
+    setActiveSlot('C');
+
+    // Auto-guide when entering Step 1 (builder phase)
+    if (guideShouldAutoStart()) {
+        setTimeout(window.startRetroGuide, 400);
+    }
+}
+function setActiveSlot(s) { state.activeSlot = s; $('slotC').classList.toggle('active', s === 'C'); $('slotCb').classList.toggle('active', s === 'Cb'); }
+function addFragment(txt) {
+    const arr = state.activeSlot === 'C' ? state.propC : state.propCb;
+    if(!arr.includes(txt)) { arr.push(txt); renderSlots(); }
+}
+function renderSlots() {
+    ['C','Cb'].forEach(slot => {
+        const el = slot==='C'?$('slotC'):$('slotCb'); el.innerHTML = '';
+        (slot==='C'?state.propC:state.propCb).forEach(txt => {
+            const d = document.createElement('div'); d.className = 'word-tile'; d.innerText = txt;
+            d.onclick = (e) => { e.stopPropagation(); (slot==='C'?state.propC:state.propCb).splice((slot==='C'?state.propC:state.propCb).indexOf(txt), 1); renderSlots(); };
+            el.appendChild(d);
+        });
+    });
+}
+function clearSlots() { state.propC = []; state.propCb = []; renderSlots(); }
+function revealPropositions() { punish(20, "Revealing answers."); state.propC = [...state.activeCase.requiredC]; state.propCb = [...state.activeCase.requiredCb]; renderSlots(); }
+function checkPropLogic() {
+    if(state.propC.join('') === state.activeCase.requiredC.join('') && state.propCb.join('') === state.activeCase.requiredCb.join('')) {
+        reward(25, "Propositions Locked"); toast("Propositions Locked!", "good");
+        $('step1').classList.add('hidden'); setupStep2();
+    } else punish(5, "Logic Mismatch.");
+}
+
+// STEP 2
+function initGrid() {
+  const grid = $('popGrid'); grid.innerHTML = '';
+  const me = document.createElement('div'); me.className = 'dot me'; me.id='dot-me'; grid.appendChild(me);
+  for(let i=1; i<100; i++) {
+    const d = document.createElement('div'); d.className = 'dot'; d.id = `dot-${i}`;
+    grid.appendChild(d);
+  }
+}
+
+function setupStep2() {
+   $('step2').classList.remove('hidden');
+   initGrid();
+   const slider = $('raritySlider');
+   
+   slider.oninput = (e) => {
+      const val = parseInt(e.target.value); 
+      const matches = Math.max(1, Math.round(50 - (val / 100 * 49))); 
+      
+      const prob_defense = matches / 100; // Denominator
+      const lr = 1 / prob_defense; // LR Calculation
+      
+      $('dynamicLR').innerText = Math.round(lr).toLocaleString();
+      $('denomDisplay').innerText = prob_defense.toFixed(2);
+      $('rarityText').innerText = `1 in ${Math.round(1/prob_defense)}`;
+      $('matchCountDisplay').innerText = matches;
+      
+      if($('mathPECBar')) $('mathPECBar').innerText = prob_defense.toFixed(4);
+      if($('mathLR')) $('mathLR').innerText = Math.round(lr).toLocaleString();
+      
+      for(let i=1; i<100; i++) {
+         const dot = $(`dot-${i}`);
+         if(i < matches) dot.classList.add('active');
+         else dot.classList.remove('active');
+      }
+
+      state.lrValue = Math.round(lr);
+      let label = "No support"; 
+      CONFIG.lrThresholds.forEach(t => { if(state.lrValue >= t.val) label = t.label; });
+      state.verbalBand = label;
+
+      const rarityType = matches > 20 ? "Common" : matches > 5 ? "Uncommon" : "Rare";
+      const logicText = `
+        <div style="margin-bottom:6px; font-weight:700; color:var(--acc);">Math Logic:</div>
+        1. <b>Numerator:</b> We assume the suspect is the source (Probability = 1.0).<br>
+        2. <b>Denominator:</b> There is a <span class="highlight-warn">${(prob_defense*100).toFixed(0)}% chance</span> a random person matches.<br>
+        3. <b>Result:</b> 1.0 ÷ ${prob_defense.toFixed(2)} = <span class="highlight-val">${Math.round(lr)}</span>.
+        <br><br>
+        <div style="border-top:1px dashed var(--mut); padding-top:6px; font-style:italic;">
+        Intuition: Because the evidence is <b>${rarityType}</b>, the Denominator is <b>${matches > 20 ? 'Large' : 'Small'}</b>, making the resulting Strength <b>${matches > 20 ? 'Low' : 'High'}</b>.
+        </div>
+      `;
+      $('intuitionBox').innerHTML = logicText;
+   };
+   
+   slider.dispatchEvent(new Event('input'));
+
+   // Auto-guide when entering Step 2
+   if (guideShouldAutoStart()) {
+       setTimeout(window.startRetroGuide, 400);
+   }
+
+   $('btnLockEval').onclick = () => { 
+       reward(25, `Evidence Evaluated (LR: ${state.lrValue})`); 
+       $('step2').classList.add('hidden'); 
+       setupReportPhaseA(); 
+   };
+}
+
+// STEP 3
+function setupReportPhaseA() {
+    $('step3').classList.remove('hidden'); $('verbalPhase').classList.remove('hidden'); $('redPenPhase').classList.add('hidden');
+    const container = $('verbalOptions'); container.innerHTML = '';
+    let options = [state.verbalBand];
+    while(options.length < 4) { const r = CONFIG.lrThresholds[Math.floor(Math.random()*CONFIG.lrThresholds.length)].label; if(!options.includes(r)) options.push(r); }
+    options.sort(() => Math.random() - 0.5);
+    options.forEach(opt => {
+        const btn = document.createElement('button'); btn.className = 'btn'; btn.innerText = opt; btn.style.width='100%';
+        btn.onclick = () => {
+            if(opt === state.verbalBand) { reward(15, "Verbal Scale Correct"); toast("Correct Verbal Band!", "good"); $('verbalPhase').classList.add('hidden'); setupReportPhaseB(); }
+            else punish(10, "Incorrect Verbal Band.");
+        };
+        container.appendChild(btn);
+    });
+
+    // Auto-guide when entering Step 3 (verbal scale)
+    if (guideShouldAutoStart()) {
+        setTimeout(window.startRetroGuide, 400);
+    }
+}
+function setupReportPhaseB() {
+    $('redPenPhase').classList.remove('hidden');
+    const box = $('editorContent'); box.innerHTML = '';
+    const text = state.activeCase.badDraft;
+    text.split(/(\[.*?\])/g).forEach(p => {
+        if(p.startsWith('[')) {
+            const sp = document.createElement('span'); sp.className = 'clickable-word bad'; sp.innerText = p.replace(/[\[\]]/g, '');
+            sp.onclick = (e) => showFixMenu(e, sp, p); box.appendChild(sp);
+        } else box.appendChild(document.createTextNode(p));
+    });
+
+    // Auto-guide for the red-pen phase of Step 3
+    if (guideShouldAutoStart()) {
+        setTimeout(window.startRetroGuide, 400);
+    }
+}
+function showFixMenu(e, el, key) {
+    if(el.classList.contains('fixed')) return;
+    const menu = $('ctxMenu'); menu.innerHTML = '';
+    state.activeCase.fixes[key].options.forEach(opt => {
+        const b = document.createElement('button'); b.className = 'correction-option'; b.innerText = opt;
+        b.onclick = () => {
+            if(opt === state.activeCase.fixes[key].correct) {
+                el.className = 'clickable-word fixed'; el.innerText = opt; state.fixedWords++;
+                if(state.fixedWords >= Object.keys(state.activeCase.fixes).length) { $('btnFinalSubmit').disabled = false; $('btnFinalSubmit').onclick = () => { reward(50, "Report Neutralized"); state.streak++; updateStats(); $('step3').classList.add('hidden'); showSummary(); }; }
+                menu.classList.add('hidden');
+            } else { punish(10, "Biased phrasing!"); el.classList.add('shake-text'); setTimeout(()=>el.classList.remove('shake-text'), 500); }
+        };
+        menu.appendChild(b);
+    });
+    menu.style.top = (e.pageY + 10) + 'px'; menu.style.left = e.pageX + 'px'; menu.classList.remove('hidden');
+    setTimeout(() => document.addEventListener('click', closeMenu), 50);
+}
+function closeMenu() { $('ctxMenu').classList.add('hidden'); document.removeEventListener('click', closeMenu); }
+
+// SUMMARY
+function showSummary() {
+    $('stepSummary').classList.remove('hidden');
+    $('finalXPDisplay').innerText = "+" + (state.xp - state.sessionStartXP);
+    $('finalLRDisplay').innerText = state.lrValue;
+    $('finalCredDisplay').innerText = state.cred + "%";
+    
+    const explanation = `The Likelihood Ratio of <b>${state.lrValue}</b> corresponds to <b>"${state.verbalBand}"</b> for the prosecution. This means the evidence is ${state.lrValue} times more likely if the prosecution's view is true rather than the defence's.`;
+    $('verbalFinalExplanation').innerHTML = explanation;
+
+    updateScales(state.lrValue, 'balanced');
+    $('priorSel').onchange = (e) => updateScales(state.lrValue, e.target.value);
+    logToNotebook(`CASE CLOSED. Total Gain: +${state.xp - state.sessionStartXP} XP`);
+}
+function updateScales(lr, priorType) {
+    const bar = $('scaleBar');
+    let priorOdds = 1; 
+    if(priorType === 'leansCb') priorOdds = 0.1;
+    if(priorType === 'leansC') priorOdds = 10;
+    const posteriorOdds = priorOdds * lr;
+    // Log scale visualization
+    let pos = 50;
+    if (posteriorOdds > 1) pos = 50 + (Math.log10(posteriorOdds) * 12);
+    else if (posteriorOdds < 1) pos = 50 - (Math.log10(1/posteriorOdds) * 12);
+    pos = Math.max(5, Math.min(95, pos));
+    
+    $('mEvidence').style.left = pos + '%';
+    const tilt = (pos - 50) / 2;
+    bar.style.transform = `rotate(${tilt}deg)`;
+}
+
+// GLOBALS
+if($('theoryBtn')) {
+    $('theoryBtn').onclick = () => {
+        showExplanation('lr');
+    };
+}
+$('helpBtn').onclick = () => { window.startRetroGuide(); };
+$('mathToggle').onclick = () => $('mathOverlay').classList.toggle('visible');
+$('notebookToggle').onclick = () => $('analystNotebook').classList.toggle('open');
+
+function showExplanation(key, e) { if(e) e.stopPropagation(); showModal('info', CONFIG.explanations[key]); }
+function showModal(type, content) {
+    const o = $('modalOverlay'); o.classList.add('open');
+    const title = $('modalTitle');
+    const body = $('modalBody');
+    const footer = $('modalFooter');
+    
+    if(type === 'info') { 
+        title.innerText = "Info"; 
+        body.innerHTML = content; 
+        footer.innerHTML = '<button class="btn primary" onclick="closeModal()">Got it</button>';
+    }
+    else if(type === 'reset') {
+        title.innerText = "Reset Simulator?";
+        body.innerHTML = "This will wipe your XP, Credibility, and progress. Are you sure?";
+        footer.innerHTML = '<button class="btn" onclick="closeModal()">Cancel</button> <button class="btn primary" style="background:var(--warn); border-color:var(--warn); color:#0a0f1f;" onclick="performReset()">Yes, Wipe Data</button>';
+    }
+    else if(type === 'credibility') {
+        title.innerText = "Credibility Score";
+        body.innerHTML = CONFIG.explanations['credibility'];
+        footer.innerHTML = '<button class="btn primary" onclick="closeModal()">Understood</button>';
+    }
+}
+function closeModal() { $('modalOverlay').classList.remove('open'); }
+function fullReset() { showModal('reset'); }
+function performReset() {
+    localStorage.clear();
+    location.reload(); 
+    state = { xp: 0, sessionStartXP: 0, streak: 0, cred: 100, difficulty: 1, activeCase: null, activeSlot: 'C', propC: [], propCb: [], lrValue: 1, fixedWords: 0, tutStep: 0, verbalBand: '' };
+    updateStats();
+    closeModal();
+    renderCabinet();
+}
+
+// Auto-guide toggling: only run automatically if user opted in
+// MODIFIED: Run by default unless explicitly disabled
+function guideShouldAutoStart() {
+  return !localStorage.getItem('fs_guide_disabled');
+}
+
+// === NINTENDO-STYLE GUIDE LOGIC ===
+(function(){
+  // Create Elements
+  const veil = document.createElement('div'); veil.className = 'retro-veil';
+  const box = document.createElement('div'); box.className = 'retro-box center'; 
+  const title = document.createElement('div'); title.className = 'retro-title';
+  const content = document.createElement('div'); content.className = 'retro-text';
+  const btn = document.createElement('button'); btn.className = 'retro-btn next'; btn.innerText = "Next (A)";
+  const skip = document.createElement('button'); skip.className = 'retro-btn skip'; skip.innerText = "B";
+  
+  // Hand & Spotlight
+  const hand = document.createElement('div'); hand.className = 'retro-hand'; hand.innerText = "👇";
+  hand.style.display = 'none';
+  
+  const spot = document.createElement('div'); spot.className = 'retro-spotlight';
+
+  // Assemble
+  box.appendChild(skip); box.appendChild(title); box.appendChild(content); box.appendChild(btn);
+  box.appendChild(hand); // Hand is now INSIDE box for relative anchoring
+  
+  document.body.appendChild(veil); 
+  document.body.appendChild(box);
+  document.body.appendChild(spot);
+
+  // State
+  let step = 0;
+  let activeGuide = []; 
+  let currentHighlight = null; 
+  let liftedParents = []; 
+  let guideTimer = null; 
+
+  // --- CONTENT DEFINITIONS (INSTRUCTIVE) ---
+  const menuSteps = [
+    { target: null, title: "🍄 WELCOME TO THE LAB!", text: "Hi there! I'm your Forensic Assistant. Press 'Next (A)' and I'll show you how to use this dashboard!" },
+    { target: '.hdr', title: "📊 DASHBOARD OVERVIEW", text: "This top bar is your status panel. Let’s quickly tour Credibility, XP, tools, and how to start a case." },
+    { target: '#credWidget', title: "❤️ CREDIBILITY (HEALTH)", text: "<b>WHAT:</b> Your professional standing. <br><b>WHY:</b> Logical errors cost you Credibility points. Keep it above 0% to stay in the lab!" },
+    { target: '#xpWidget', title: "⭐ XP (SCORE)", text: "<b>WHAT:</b> Your Experience Points. <br><b>WHY:</b> Solve cases to level up from Rookie to Master Analyst." },
+    { target: '#mathToggle', title: "📊 STATS OVERLAY", text: "<b>WHAT:</b> A toggle for the raw numbers. <br><b>WHY:</b> Use this if you want to see the exact probability values behind the scenes." },
+    { target: '#caseGrid', title: "🗄️ MISSION SELECT", text: "<b>WHAT:</b> The Case Cabinet. <br><b>WHY:</b> Click a folder here to start your first mission!" }
+  ];
+  
+  const briefingSteps = [
+    { target: '#briefingTitle', title: "📂 CASE FILE OPENED", text: "<b>WHAT:</b> The case name and type.<br><b>WHY:</b> Always check if this matches your expertise level before starting." },
+    { target: '.briefing-box .soft', title: "📝 SCENARIO & DEFENCE", text: "<b>WHAT:</b> The core conflict.<br><b>WHY:</b> Look at the Defence. Do they admit to the <i>act</i> or just being <i>present</i>? If they deny presence entirely, it's a <b>Source</b> issue. If they admit presence but deny the crime, it's <b>Activity</b>." },
+    { target: 'button.primary', title: "🚀 LAUNCH MISSION", text: "<b>WHAT:</b> The start button.<br><b>WHY:</b> Press this when you are ready to begin the analysis phase." }
+  ];
+
+  const step1Phase1Steps = [
+    { target: '#caseTypeDisplay', title: "🏷️ CASE TYPE", text: "<b>WHAT:</b> The Case Badge.<br><b>WHY:</b> It tells you if you are solving for SOURCE (Who?) or ACTIVITY (How?). Check this first!" },
+    { target: '.decision-box', title: "🤔 STRATEGY CHOICE", text: "<b>WHAT:</b> Your first big decision.<br><b>WHY:</b> Read the Defence Statement above. If they admit being there, choose Activity. If they deny it, choose Source." },
+    { target: '.level-card .info-btn', title: "ℹ️ INFO BUTTONS", text: "<b>WHAT:</b> Context Help.<br><b>WHY:</b> Not sure about a term? Look for these 'i' buttons. They give you definitions without penalty!" }
+  ];
+
+  const step1Phase2Steps = [
+    { target: '#slotC', title: "🧩 PROPOSITION BUILDER", text: "<b>WHAT:</b> The Logic Slots.<br><b>WHY:</b> Construct the Prosecution (C) and Defence (Cb) arguments. Select fragments from the bank to build logical, opposing statements based on the case scenario." },
+    { target: '#bankSource', title: "🔤 WORD BANK", text: "<b>WHAT:</b> Your evidence fragments.<br><b>WHY:</b> Don't guess! Only use words that appear in the case scenario." }
+  ];
+
+  const step2Steps = [
+    { target: '#raritySlider', title: "🎛️ RARITY SCANNER", text: "<b>WHAT:</b> The Probability Slider.<br><b>WHY:</b> Estimate the probability of the evidence occurring by chance (Random Match Probability). If the evidence is <b>Rare</b> (low probability), the Likelihood Ratio (Strength) goes up!" },
+    { target: '#dynamicLR', title: "⚡ POWER LEVEL (LR)", text: "<b>WHAT:</b> The Likelihood Ratio.<br><b>WHY:</b> This number tells the court how strong the evidence is. You want this to be accurate!" },
+    { target: '#step2 .info-btn', title: "ℹ️ MATH HELP", text: "<b>WHAT:</b> The Theory Refresher.<br><b>WHY:</b> Stuck on the math? This button explains the Likelihood Ratio formula in plain English." }
+  ];
+
+  const step3Phase1Steps = [
+    { target: '#verbalOptions', title: "🗣️ VERBAL SCALE", text: "<b>WHAT:</b> Translation Tools.<br><b>WHY:</b> The jury doesn't understand raw math. Pick the phrase that matches your LR number." }
+  ];
+
+  const step3Phase2Steps = [
+    { target: '#editorContent', title: "🖊️ THE RED PEN", text: "<b>WHAT:</b> The Final Report.<br><b>WHY:</b> Watch out for the 'Prosecutor's Fallacy' (transposing the conditional). We can say the evidence is likely given guilt, but NOT that guilt is likely given the evidence. Click the RED words to fix logical errors." },
+    { target: '#step3 .info-btn', title: "ℹ️ LOGIC CHECK", text: "<b>WHAT:</b> Fallacy Warning.<br><b>WHY:</b> Click this if you forget what the 'Prosecutor's Fallacy' is. It's a common trap!" }
+  ];
+
+  function runStep(idx) {
+    if(idx >= activeGuide.length) return endGuide();
+    if(guideTimer) clearTimeout(guideTimer);
+
+    const s = activeGuide[idx];
+    if (s.target) {
+        const el = document.querySelector(s.target);
+        if (!el || el.offsetParent === null) {
+            runStep(idx + 1); 
+            return;
+        }
+    }
+
+    step = idx;
+    
+    if (currentHighlight) {
+       currentHighlight.classList.remove('retro-pop-up');
+       currentHighlight = null;
+    }
+    liftedParents.forEach(p => p.classList.remove('retro-lift'));
+    liftedParents = [];
+
+    hand.style.display = 'none';
+    
+    title.innerHTML = s.title;
+    content.innerHTML = s.text;
+    
+    document.body.classList.add('retro-lock'); // allow vertical scroll, keep layout stable
+
+    if(s.target) {
+       const el = document.querySelector(s.target);
+       if(el) {
+          el.scrollIntoView({behavior: "smooth", block: "center"});
+          
+          guideTimer = setTimeout(() => {
+              const rect = el.getBoundingClientRect();
+              
+              // 1. Draw Spotlight (Visual Hole)
+              spot.style.top = (rect.top + window.scrollY - 8) + 'px'; 
+              spot.style.left = (rect.left + window.scrollX - 8) + 'px';
+              spot.style.width = (rect.width + 16) + 'px'; 
+              spot.style.height = (rect.height + 16) + 'px';
+              spot.classList.add('active');
+              
+              // 2. Lift Target
+              currentHighlight = el;
+              currentHighlight.classList.add('retro-pop-up');
+              let parent = el.parentElement;
+              while (parent && parent !== document.body) {
+                  const style = window.getComputedStyle(parent);
+                  if (style.transform !== 'none' || style.position === 'relative' || style.position === 'absolute' || style.zIndex !== 'auto') {
+                      parent.classList.add('retro-lift');
+                      liftedParents.push(parent);
+                  }
+                  if (parent.classList.contains('card') || parent.id === 'flowView') break;
+                  parent = parent.parentElement;
+              }
+
+              // 3. Dynamic Box Placement with overlap check + enforced gap
+              box.classList.remove('center', 'top', 'bottom');
+              box.style.display = 'flex';           // ensure visible for measurement
+              box.style.top = '';                   // clear any inline positioning
+              box.style.bottom = '';               
+              box.style.transform = 'translateX(-50%)';
+
+              // Screen size check for spacing
+              const isSmallScreen = window.innerWidth < 600 || window.innerHeight < 700;
+              const gapSize = isSmallScreen ? 55 : 90;      // hand distance
+              const minGap = isSmallScreen ? 32 : 48;       // *required* gap between target and box
+
+              // Where is the target vertically?
+              const viewportHeight = window.innerHeight;
+              const centerY = rect.top + rect.height / 2;
+
+              // First guess: element in TOP half → box at BOTTOM, else TOP
+              let placeAtBottom = centerY < viewportHeight / 2;
+
+              function applyBoxPosition(atBottom) {
+                  box.classList.toggle('bottom', atBottom);
+                  box.classList.toggle('top', !atBottom);
+              }
+
+              applyBoxPosition(placeAtBottom);
+
+              // Measure and check for vertical overlap with target
+              let boxRect = box.getBoundingClientRect();
+              const targetTop = rect.top;
+              const targetBottom = rect.bottom;
+
+              // Check if box overlaps the target's vertical space
+              const overlapsVertically = !(boxRect.bottom < targetTop || boxRect.top > targetBottom);
+
+              // If our first guess covers the element, flip side and re-measure
+              if (overlapsVertically) {
+                  placeAtBottom = !placeAtBottom;
+                  applyBoxPosition(placeAtBottom);
+                  boxRect = box.getBoundingClientRect(); 
+              }
+
+              // NEW: force some breathing room between the box and the highlighted element
+              const desiredGap = minGap;
+              let boxTop = boxRect.top;
+              let boxBottom = boxRect.bottom;
+
+              if (placeAtBottom) {
+                  // Box is below the element → increase space between element bottom and box top
+                  const currentGap = boxTop - targetBottom;
+                  if (currentGap < desiredGap) {
+                      const shift = desiredGap - currentGap;
+                      const maxTop = viewportHeight - boxRect.height - 16; // keep box on-screen
+                      const newTop = Math.min(boxTop + shift, maxTop);
+                      box.style.top = `${newTop}px`;
+                      box.style.bottom = 'auto';
+                      boxRect = box.getBoundingClientRect();
+                  }
+              } else {
+                  // Box is above the element → increase space between box bottom and element top
+                  const currentGap = targetTop - boxBottom;
+                  if (currentGap < desiredGap) {
+                      const shift = desiredGap - currentGap;
+                      const minTop = 16; // small safety margin from top of viewport
+                      const newTop = Math.max(boxTop - shift, minTop);
+                      box.style.top = `${newTop}px`;
+                      box.style.bottom = 'auto';
+                      boxRect = box.getBoundingClientRect();
+                  }
+              }
+
+              // 4. Hand placement relative to box + element
+
+              // Horizontal: align hand with target centre
+              const targetCenterX = rect.left + rect.width / 2;
+              const boxCenterX = boxRect.left + boxRect.width / 2;
+              const offsetX = targetCenterX - boxCenterX;
+              hand.style.left = `calc(50% + ${offsetX}px)`;
+
+              // Vertical + orientation:
+              //  - box at bottom  → hand above box, pointing UP
+              //  - box at top     → hand below box, pointing DOWN
+              if (placeAtBottom) {
+                  hand.style.top = `-${gapSize}px`;
+                  hand.innerText = '👆';
+                  hand.classList.remove('animate-down');
+                  hand.classList.add('animate-up');
+              } else {
+                  const extra = isSmallScreen ? 24 : 40;
+                  hand.style.top = `calc(100% + ${extra}px)`;
+                  hand.innerText = '👇';
+                  hand.classList.remove('animate-up');
+                  hand.classList.add('animate-down');
+              }
+              hand.style.display = 'block';
+              
+          }, 400); 
+       }
+    } else {
+       box.classList.remove('top', 'bottom');
+       box.classList.add('center');
+       // IMPORTANT FIX: Clear inline styles that might interfere with CSS centering
+       box.style.top = ''; box.style.bottom = ''; box.style.transform = '';
+       
+       box.style.display = 'flex'; 
+       spot.classList.remove('active');
+       hand.style.display = 'none';
+    }
+    
+    veil.classList.add('active');
+  }
+
+  function endGuide() {
+    if(guideTimer) clearTimeout(guideTimer); 
+    veil.classList.remove('active');
+    box.style.display = 'none'; 
+    spot.classList.remove('active');
+    hand.style.display = 'none';
+    if (currentHighlight) {
+       currentHighlight.classList.remove('retro-pop-up');
+       currentHighlight = null;
+    }
+    liftedParents.forEach(p => p.classList.remove('retro-lift'));
+    liftedParents = [];
+    localStorage.setItem('fs_tour_seen', '1');
+    document.body.classList.remove('retro-lock');
+  }
+
+  btn.onclick = () => {
+      if (step === -1) {
+          // User said YES to guidance → remember preference
+          localStorage.setItem('fs_guide_enabled', 'true');
+          window.startRetroGuide();
+      } else {
+          runStep(step + 1);
+      }
+  };
+  skip.onclick = endGuide;
+
+  window.startRetroGuide = () => {
+      // Hide the "Don't show again" button during normal tours
+      const disableBtn = document.getElementById('retroDisableBtn');
+      if (disableBtn) disableBtn.style.display = 'none';
+
+      activeGuide = menuSteps; 
+
+      if (!$('cabinetView').classList.contains('hidden')) {
+          activeGuide = menuSteps;
+      } 
+      else if (!$('briefingView').classList.contains('hidden')) {
+          activeGuide = briefingSteps;
+      }
+      else if (!$('step1').classList.contains('hidden')) {
+          if (!$('step1_phase1').classList.contains('hidden')) activeGuide = step1Phase1Steps;
+          else activeGuide = step1Phase2Steps;
+      } 
+      else if (!$('step2').classList.contains('hidden')) {
+          activeGuide = step2Steps;
+      } 
+      else if (!$('step3').classList.contains('hidden')) {
+           if (!$('verbalPhase').classList.contains('hidden')) activeGuide = step3Phase1Steps;
+           else activeGuide = step3Phase2Steps;
+      } 
+
+      btn.innerText = "Next (A)";
+      skip.innerText = "B";
+      runStep(0);
+  };
+
+  window.askToStartGuide = () => {
+      if (localStorage.getItem('fs_guide_disabled')) return;
+
+      step = -1; 
+      title.innerText = "🍄 NEW ANALYST DETECTED";
+      content.innerText = "Would you like me to guide you through the basics?";
+      
+      btn.innerText = "YES (A)";
+      skip.innerText = "NO (B)";
+      
+      if (!document.getElementById('retroDisableBtn')) {
+          const disableBtn = document.createElement('button');
+          disableBtn.id = 'retroDisableBtn';
+          disableBtn.className = 'retro-btn disable';
+          disableBtn.innerText = "Don't Show Again (X)";
+          disableBtn.onclick = () => {
+              localStorage.setItem('fs_guide_disabled', 'true');
+              endGuide();
+              toast("Guide disabled forever.", "neutral");
+          };
+          box.appendChild(disableBtn);
+      } else {
+          document.getElementById('retroDisableBtn').style.display = 'flex';
+      }
+      
+      box.classList.remove('top', 'bottom'); box.classList.add('center');
+      // IMPORTANT FIX: Clear inline styles here too
+      box.style.top = ''; box.style.bottom = ''; box.style.transform = '';
+      
+      box.style.display = 'flex'; 
+      spot.classList.remove('active');
+      hand.style.display = 'none'; 
+      veil.classList.add('active');
+  };
+
+})();
+
+init();
+</script>
+</body>
+</html>
