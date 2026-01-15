@@ -1,0 +1,2186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>R-Studio: Syntax Overdrive v6.18 (Analysis Module)</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap');
+
+    :root{
+      --bg-dark:#0f172a;
+      --terminal-bg:#020617;
+      --neon-blue:#3b82f6;
+      --neon-gold:#fbbf24;
+      --neon-green:#10b981;
+      --neon-red:#ef4444;
+      --neon-purple:#8b5cf6;
+      --neon-cyan:#22d3ee;
+      --neon-pink:#f472b6;
+    }
+
+    body{
+      font-family:'JetBrains Mono', monospace;
+      background-color:#020617;
+      color:#f1f5f9;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    /* --- SCROLLBARS --- */
+    .force-scroll::-webkit-scrollbar{ width:8px; height:8px; }
+    .force-scroll::-webkit-scrollbar-track{ background:#1e293b; }
+    .force-scroll::-webkit-scrollbar-thumb{ background:#475569; border-radius:4px; }
+    .force-scroll::-webkit-scrollbar-thumb:hover{ background:#64748b; }
+
+    /* --- ANIMATIONS --- */
+    @keyframes scanline {
+      0% { transform: translateY(-100%); }
+      100% { transform: translateY(100%); }
+    }
+    .scanline::after {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: linear-gradient(to bottom, transparent 50%, rgba(59, 130, 246, 0.03) 50%);
+      background-size: 100% 4px;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 10px rgba(59, 130, 246, 0.2); }
+      50% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.5); }
+    }
+    .neon-border { animation: pulse-glow 3s infinite; }
+
+    /* --- TERMINAL --- */
+    #console-output {
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+    .console-line { margin-bottom: 2px; word-break: break-all; }
+    .console-success { color: var(--neon-green); }
+    .console-error { color: var(--neon-red); }
+    .console-info { color: var(--neon-blue); }
+    .console-user { color: var(--neon-gold); font-weight: bold; }
+    .console-sys { color: var(--neon-cyan); font-weight: bold; }
+
+    /* --- UI ELEMENTS --- */
+    .menu-btn {
+      transition: all 0.2s;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .menu-btn:hover {
+      background: rgba(59, 130, 246, 0.1);
+      border-color: var(--neon-blue);
+      transform: translateX(4px);
+    }
+    
+    .crt-overlay {
+      background: radial-gradient(circle, rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 100%);
+      pointer-events: none;
+    }
+
+    .level-card.locked { opacity: 0.5; filter: grayscale(1); cursor: not-allowed; }
+    .level-card.completed { border-color: var(--neon-green); }
+
+    /* Floating Text */
+    .floating-text {
+      position: absolute;
+      pointer-events: none;
+      animation: floatUp 1.5s ease-out forwards;
+      z-index: 50;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+    }
+    @keyframes floatUp {
+      0% { opacity: 1; transform: translateY(0) scale(1); }
+      100% { opacity: 0; transform: translateY(-40px) scale(1.2); }
+    }
+    
+    /* Tables for Data Viewer */
+    .data-table-restored th { padding: 4px 8px; font-weight: 800; text-transform: uppercase; background: #0f172a; position: sticky; top:0; }
+    .data-table-restored td { padding: 4px 8px; border-bottom: 1px solid #1e293b; }
+    .data-table-restored tr:hover td { background: #1e293b; color: white; }
+  </style>
+</head>
+<body class="flex flex-col relative">
+
+  <!-- BACKGROUND GRID -->
+  <div class="absolute inset-0 z-[-1]" 
+       style="background-image: radial-gradient(#1e293b 1px, transparent 1px); background-size: 20px 20px; opacity: 0.3;">
+  </div>
+  <div class="absolute inset-0 z-[-1] crt-overlay"></div>
+
+  <!-- HEADER -->
+  <header class="h-14 border-b border-slate-700 bg-slate-900/80 flex items-center justify-between px-4 backdrop-blur-md z-20">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded bg-blue-600 flex items-center justify-center text-white font-bold shadow-lg shadow-blue-500/30">
+        R
+      </div>
+      <h1 class="text-lg font-bold tracking-tight text-blue-100">
+        SYNTAX OVERDRIVE <span class="text-xs text-blue-400 font-normal ml-1">v6.18</span>
+      </h1>
+    </div>
+
+    <!-- HUD -->
+    <div class="flex items-center gap-6 text-sm font-mono">
+      <div class="flex items-center gap-2" title="Streak Multiplier">
+        <i data-lucide="flame" class="w-4 h-4 text-orange-400"></i>
+        <span id="streak-badge" class="hidden bg-orange-500/20 text-orange-300 px-1.5 rounded text-xs">x<span id="streak-count">1</span></span>
+      </div>
+      
+      <div class="flex items-center gap-2">
+        <i data-lucide="clock" class="w-4 h-4 text-slate-400"></i>
+        <span id="timer-display" class="font-bold text-slate-200">02:00</span>
+      </div>
+
+      <div class="flex items-center gap-2 bg-slate-800 px-3 py-1 rounded border border-slate-700">
+        <i data-lucide="trophy" class="w-4 h-4 text-yellow-400"></i>
+        <span id="score-display" class="font-bold text-yellow-100">0000</span>
+        <span id="debt-badge" class="hidden text-[10px] text-red-400 uppercase font-bold tracking-wider">DEBT</span>
+      </div>
+
+      <div class="flex gap-2">
+        <button id="cheat-btn" class="p-2 hover:bg-slate-700 rounded text-blue-300 transition-colors border border-transparent hover:border-blue-500/30" title="Reference Manual">
+            <i data-lucide="book-open" class="w-5 h-5"></i>
+        </button>
+
+        <button id="menu-btn" class="p-2 hover:bg-slate-700 rounded text-slate-300 transition-colors">
+            <i data-lucide="menu" class="w-5 h-5"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN LAYOUT -->
+  <main class="flex-1 flex overflow-hidden relative">
+    
+    <!-- LEFT PANEL: CONTEXT & EDITOR -->
+    <div class="w-1/2 flex flex-col border-r border-slate-700 bg-slate-900/50">
+      
+      <!-- TASK PANE -->
+      <div class="h-1/3 p-6 border-b border-slate-700 overflow-y-auto force-scroll bg-slate-900">
+        <div class="flex justify-between items-start mb-2">
+          <span id="level-badge" class="text-xs font-bold px-2 py-0.5 rounded bg-blue-900 text-blue-300 border border-blue-700">
+            TRAINING
+          </span>
+          <div class="flex gap-1">
+             <div class="w-2 h-2 rounded-full bg-red-500" title="Close/Reset"></div>
+             <div class="w-2 h-2 rounded-full bg-yellow-500" title="Minimize"></div>
+             <div class="w-2 h-2 rounded-full bg-green-500" title="Maximize"></div>
+          </div>
+        </div>
+        <h2 id="level-title" class="text-xl font-bold text-white mb-2">Initialize System</h2>
+        <p id="level-desc" class="text-slate-400 text-sm leading-relaxed mb-4">
+          Welcome to the R console. Your first task is to prove you are ready.
+        </p>
+        
+        <!-- HINT & ANALYSIS SYSTEM -->
+        <div class="bg-slate-800/50 rounded border border-slate-700 p-3">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">Support Modules</span>
+            <span id="hint-cost" class="text-xs text-red-400 font-mono">-50 pts</span>
+          </div>
+          <div id="hint-box" class="hidden text-sm text-blue-300 font-mono mb-2 p-2 bg-blue-900/20 rounded"></div>
+          <div class="flex gap-2">
+             <button id="hint-btn" class="flex-1 text-xs bg-slate-700 hover:bg-slate-600 text-white py-1.5 rounded transition-colors border border-slate-600 flex items-center justify-center gap-2">
+               <i data-lucide="help-circle" class="w-3 h-3"></i> HINT
+             </button>
+             <button id="analysis-btn" class="flex-1 text-xs bg-purple-900/40 hover:bg-purple-800/60 text-purple-200 py-1.5 rounded transition-colors border border-purple-700/50 flex items-center justify-center gap-2">
+               <i data-lucide="microscope" class="w-3 h-3"></i> SYS ANALYSIS
+             </button>
+             <button id="reveal-btn" class="px-3 text-xs bg-red-900/30 hover:bg-red-900/50 text-red-400 border border-red-800/50 rounded transition-colors" title="Give Up">
+               <i data-lucide="flag" class="w-3 h-3"></i>
+             </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- EDITOR PANE -->
+      <div class="flex-1 flex flex-col bg-[#0d1117] relative group overflow-hidden">
+        <div class="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+          <span class="text-xs text-slate-600 font-mono">source_editor.R</span>
+        </div>
+        
+        <!-- Multiple Choice Interface -->
+        <div id="mcq-interface" class="hidden absolute inset-0 z-10 bg-[#0d1117] p-6 flex flex-col justify-center gap-3">
+            <!-- Options injected here -->
+        </div>
+
+        <!-- Fake Data Tab Interface (New) -->
+        <div id="data-tab" class="hidden absolute inset-0 z-10 bg-[#0d1117] flex flex-col">
+            <div class="h-8 bg-slate-800 flex items-center px-2 gap-1 border-b border-slate-700">
+                <div class="flex items-center bg-slate-900 px-3 py-1 rounded-t text-xs text-blue-300 border-t border-l border-r border-slate-700">
+                    <i data-lucide="table" class="w-3 h-3 mr-2"></i>
+                    <span id="data-tab-title">Untitled</span>
+                    <button id="close-data-tab" class="ml-2 hover:text-red-400"><i data-lucide="x" class="w-3 h-3"></i></button>
+                </div>
+            </div>
+            <div class="flex-1 p-4 overflow-auto font-mono text-xs text-slate-300">
+                <!-- Content here: either text or HTML table -->
+                <div id="data-tab-content"></div>
+            </div>
+        </div>
+
+        <!-- Code Editor -->
+        <textarea id="code-input" 
+          class="flex-1 bg-transparent text-blue-100 font-mono p-4 resize-none focus:outline-none text-sm leading-6 selection:bg-blue-500/30 w-full h-full relative z-0"
+          spellcheck="false"
+          placeholder="# Type your R code here..."></textarea>
+        
+        <!-- SUBMIT BAR -->
+        <div class="h-12 border-t border-slate-700 bg-slate-800 flex items-center px-4 justify-between relative z-20">
+          <span class="text-xs text-slate-500 flex items-center gap-2">
+             <i data-lucide="terminal" class="w-3 h-3"></i> R 4.3.1
+          </span>
+          <button id="run-btn" class="bg-green-600 hover:bg-green-500 text-white text-sm font-bold px-6 py-1.5 rounded shadow-lg shadow-green-500/20 transition-all active:scale-95 flex items-center gap-2">
+            <i data-lucide="play" class="w-3 h-3 fill-current"></i> RUN
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL: CONSOLE & ENVIRONMENT -->
+    <div class="w-1/2 flex flex-col bg-slate-950 scanline">
+      
+      <!-- ENVIRONMENT VISUALIZER -->
+      <div class="h-1/3 border-b border-slate-800 bg-slate-900/30 p-4 overflow-auto force-scroll">
+         <div class="flex items-center gap-2 mb-2 text-slate-500 text-xs uppercase tracking-wider font-bold">
+           <i data-lucide="database" class="w-3 h-3"></i> Environment
+         </div>
+         <div id="env-display" class="grid grid-cols-2 gap-2 text-xs font-mono">
+           <!-- Env vars injected here -->
+           <div class="p-2 bg-slate-800/50 rounded border border-slate-700/50 text-slate-400 italic">Global Environment is empty</div>
+         </div>
+      </div>
+
+      <!-- CONSOLE -->
+      <div class="flex-1 p-4 overflow-y-auto force-scroll font-mono text-sm relative" id="console-output">
+        <div class="text-slate-500 mb-4">
+          R version 4.3.1 (2023-06-16) -- "Beagle Scouts"<br>
+          Copyright (C) 2023 The R Foundation for Statistical Computing<br>
+          Platform: x86_64-pc-linux-gnu (64-bit)<br>
+          <br>
+          Type 'q()' to quit R.<br>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- STARTUP OVERLAY (GUIDE) -->
+  <div id="start-overlay" class="absolute inset-0 z-[60] bg-slate-900/95 flex items-center justify-center backdrop-blur-sm">
+    <div class="max-w-3xl w-full p-8 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl relative overflow-hidden">
+        <!-- Decoration -->
+        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500"></div>
+        
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-900/30 rounded-full mb-4 border border-blue-500/30">
+                <i data-lucide="cpu" class="w-8 h-8 text-blue-400"></i>
+            </div>
+            <h1 class="text-3xl font-bold text-white tracking-tight mb-2">SYSTEM BOOT SEQUENCE</h1>
+            <p class="text-slate-400 font-mono text-sm">R-Studio: Syntax Overdrive v6.18</p>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div class="p-4 bg-slate-800/50 rounded border border-slate-700">
+                <div class="flex items-center gap-2 mb-2 text-blue-400 font-bold text-sm">
+                    <i data-lucide="code-2" class="w-4 h-4"></i> MISSION
+                </div>
+                <p class="text-xs text-slate-400 leading-relaxed">
+                    Write correct R syntax to manipulate the environment.
+                </p>
+            </div>
+             <div class="p-4 bg-slate-800/50 rounded border border-slate-700">
+                <div class="flex items-center gap-2 mb-2 text-green-400 font-bold text-sm">
+                    <i data-lucide="play-circle" class="w-4 h-4"></i> EXECUTION
+                </div>
+                <p class="text-xs text-slate-400 leading-relaxed">
+                    Press <span class="text-white font-mono bg-slate-700 px-1 rounded">RUN</span> to execute code.
+                </p>
+            </div>
+             <div class="p-4 bg-slate-800/50 rounded border border-slate-700">
+                <div class="flex items-center gap-2 mb-2 text-purple-400 font-bold text-sm">
+                    <i data-lucide="microscope" class="w-4 h-4"></i> ANALYSIS
+                </div>
+                <p class="text-xs text-slate-400 leading-relaxed">
+                    Use <span class="text-white font-mono bg-slate-700 px-1 rounded">SYS ANALYSIS</span> for a detailed breakdown of what happened.
+                </p>
+            </div>
+             <div class="p-4 bg-slate-800/50 rounded border border-slate-700">
+                <div class="flex items-center gap-2 mb-2 text-yellow-400 font-bold text-sm">
+                    <i data-lucide="database" class="w-4 h-4"></i> DATA
+                </div>
+                <p class="text-xs text-slate-400 leading-relaxed">
+                    Click environment objects to view their table structure.
+                </p>
+            </div>
+        </div>
+
+        <button id="start-btn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded text-lg tracking-widest transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 group">
+            INITIALIZE SESSION <i data-lucide="arrow-right" class="w-5 h-5 group-hover:translate-x-1 transition-transform"></i>
+        </button>
+    </div>
+  </div>
+
+  <!-- ANALYSIS MODAL (NEW) -->
+  <div id="analysis-modal" class="absolute inset-0 z-[80] bg-slate-950/90 flex items-center justify-center backdrop-blur-md hidden">
+    <div class="max-w-2xl w-full max-h-[80vh] flex flex-col bg-slate-900 border border-purple-500/50 rounded-xl shadow-2xl relative overflow-hidden">
+        <div class="p-6 border-b border-purple-500/30 bg-purple-900/10 flex justify-between items-center">
+            <h2 class="text-xl font-bold text-purple-200 flex items-center gap-2">
+                <i data-lucide="microscope" class="w-5 h-5 text-purple-400"></i> SYSTEM ANALYSIS LOG
+            </h2>
+            <button id="close-analysis-btn" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-6 h-6"></i></button>
+        </div>
+        <div class="p-6 overflow-y-auto font-mono text-sm leading-relaxed text-slate-300">
+            <div class="mb-4">
+                <span class="text-xs font-bold text-purple-400 uppercase tracking-widest block mb-1">Target Protocol</span>
+                <div id="analysis-title" class="text-white font-bold text-lg"></div>
+            </div>
+            
+            <div class="mb-4">
+                <span class="text-xs font-bold text-purple-400 uppercase tracking-widest block mb-1">Operational Logic</span>
+                <div id="analysis-text" class="bg-slate-950 p-4 rounded border border-slate-700"></div>
+            </div>
+
+            <div class="mb-4">
+                <span class="text-xs font-bold text-purple-400 uppercase tracking-widest block mb-1">Correct Syntax Pattern</span>
+                <div id="analysis-syntax" class="text-green-400 bg-slate-950 p-2 rounded border border-slate-700 font-bold"></div>
+            </div>
+        </div>
+    </div>
+  </div>
+
+  <!-- TIMEOUT OVERLAY -->
+  <div id="timeout-modal" class="absolute inset-0 z-[70] bg-slate-950/90 flex items-center justify-center backdrop-blur-md hidden">
+    <div class="max-w-md w-full p-6 bg-slate-900 border border-red-500/50 rounded-xl shadow-2xl relative">
+        <div class="text-center mb-6">
+            <div class="inline-flex items-center justify-center w-12 h-12 bg-red-900/30 rounded-full mb-3 border border-red-500/30">
+                <i data-lucide="alert-triangle" class="w-6 h-6 text-red-500"></i>
+            </div>
+            <h2 class="text-2xl font-bold text-white mb-1">TIME LIMIT EXCEEDED</h2>
+            <p class="text-slate-400 text-sm">The process has timed out.</p>
+        </div>
+        
+        <div class="text-center mb-6 text-sm text-slate-300 px-4">
+            Do you want to see the solution and explanation?
+        </div>
+
+        <div class="flex gap-3">
+            <button id="timeout-retry-btn" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-3 rounded border border-slate-600 transition-colors text-xs flex flex-col items-center justify-center gap-1">
+                <span>NO, EXTEND TIME</span>
+                <span class="text-[10px] text-slate-400 font-normal">-20 PTS</span>
+            </button>
+            <button id="timeout-reveal-btn" class="flex-1 bg-red-900/50 hover:bg-red-900 text-red-100 font-bold py-3 rounded border border-red-800 transition-colors text-xs flex flex-col items-center justify-center gap-1">
+                <span>YES, REVEAL & EXPLAIN</span>
+                <span class="text-[10px] text-red-300 font-normal">-50 PTS</span>
+            </button>
+        </div>
+    </div>
+  </div>
+
+  <!-- LEVEL SELECT MODAL -->
+  <div id="level-menu" class="absolute inset-0 bg-slate-900/90 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+    <div class="bg-slate-800 border border-slate-700 rounded-xl shadow-2xl w-[900px] max-h-[90vh] flex flex-col overflow-hidden">
+      <div class="p-6 border-b border-slate-700 flex justify-between items-center bg-slate-900">
+        <div>
+          <h2 class="text-2xl font-bold text-white mb-1">Campaign Select</h2>
+          <p class="text-sm text-slate-400">Select a module to begin training.</p>
+        </div>
+        <button id="close-menu-btn" class="p-2 hover:bg-slate-700 rounded text-slate-400">
+          <i data-lucide="x" class="w-6 h-6"></i>
+        </button>
+      </div>
+      
+      <div class="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 bg-slate-950" id="campaign-grid">
+        <!-- Campaign Cards Generated JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- CHEAT SHEET MODAL -->
+  <div id="cheat-menu" class="absolute inset-0 bg-slate-900/90 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+    <div class="bg-slate-800 border border-slate-700 rounded-xl shadow-2xl w-[900px] max-h-[90vh] flex flex-col overflow-hidden">
+        <div class="p-6 border-b border-slate-700 flex justify-between items-center bg-slate-900">
+        <div>
+            <h2 class="text-2xl font-bold text-blue-100 mb-1 flex items-center gap-2">
+                <i data-lucide="book-open" class="w-6 h-6 text-blue-500"></i> Reference Manual
+            </h2>
+            <p class="text-sm text-slate-400">Operational Syntax & Definitions</p>
+        </div>
+        <button id="close-cheat-btn" class="p-2 hover:bg-slate-700 rounded text-slate-400">
+            <i data-lucide="x" class="w-6 h-6"></i>
+        </button>
+        </div>
+        
+        <div class="flex-1 overflow-y-auto p-6 bg-slate-950 font-mono text-sm space-y-8" id="cheat-content">
+        <!-- Cheat Sheet Content Generated JS -->
+        </div>
+    </div>
+  </div>
+
+<script>
+/* ========================================
+  GAME DATA & CAMPAIGN CONFIGURATION
+  ========================================
+*/
+
+/* --- DATASET DEFINITIONS (UPDATED FOR ADVANCED MODULES) --- */
+const datasetDefinitions = {
+    // Basic Data
+    "df": `
+    <table class="w-full text-left border-collapse data-table-restored">
+        <thead><tr class="text-blue-300 border-b border-slate-700"><th></th><th>id</th><th>name</th><th>score</th></tr></thead>
+        <tbody class="text-slate-400 font-mono text-xs">
+            <tr><td class="text-slate-600">1</td><td>1</td><td>Bob</td><td>85</td></tr>
+            <tr><td class="text-slate-600">2</td><td>2</td><td>Alice</td><td>92</td></tr>
+            <tr><td class="text-slate-600">3</td><td>3</td><td>Tim</td><td>NA</td></tr>
+            <tr><td class="text-slate-600">4</td><td>4</td><td>NA</td><td>78</td></tr>
+        </tbody>
+    </table>`,
+
+    // Sigma Challenge Data
+    "obesity": `
+    <table class="w-full text-left border-collapse data-table-restored">
+        <thead><tr class="text-blue-300 border-b border-slate-700"><th></th><th>patno</th><th>age</th><th>gender</th><th>height</th><th>weightweek0</th><th>treatgroup</th><th>weightchange</th></tr></thead>
+        <tbody class="text-slate-400 font-mono text-xs">
+            <tr class="even:bg-slate-800/30"><td class="text-slate-600">1</td><td>1</td><td>45</td><td>M</td><td>1.75</td><td>98.2</td><td>1</td><td>-3.1</td></tr>
+            <tr class="even:bg-slate-800/30"><td class="text-slate-600">2</td><td>2</td><td>32</td><td>F</td><td>1.62</td><td>82.0</td><td>2</td><td>-1.5</td></tr>
+            <tr class="even:bg-slate-800/30"><td class="text-slate-600">3</td><td>3</td><td>51</td><td>M</td><td>1.80</td><td>105.0</td><td>2</td><td>-5.8</td></tr>
+            <tr class="even:bg-slate-800/30"><td class="text-slate-600">4</td><td>4</td><td>29</td><td>F</td><td>1.68</td><td>90.1</td><td>1</td><td>-2.1</td></tr>
+            <tr class="even:bg-slate-800/30"><td class="text-slate-600">5</td><td>...</td><td>...</td><td>...</td><td>...</td><td>...</td><td>...</td><td>...</td></tr>
+        </tbody>
+    </table>`,
+
+    // Association Rules: Transactions
+    "transactions": `
+    <div class="text-xs font-mono text-slate-400 mb-2">transactions in sparse format with 5 transactions (rows) and 10 items (columns)</div>
+    <table class="w-full text-left border-collapse data-table-restored">
+        <thead><tr class="text-blue-300 border-b border-slate-700"><th>row</th><th>items</th></tr></thead>
+        <tbody class="text-slate-400 font-mono text-xs">
+            <tr class="even:bg-slate-800/30"><td class="text-slate-600">[1]</td><td>{bread, milk}</td></tr>
+            <tr class="even:bg-slate-800/30"><td class="text-slate-600">[2]</td><td>{bread, diapers, beer, eggs}</td></tr>
+            <tr class="even:bg-slate-800/30"><td class="text-slate-600">[3]</td><td>{milk, diapers, beer, cola}</td></tr>
+            <tr class="even:bg-slate-800/30"><td class="text-slate-600">[4]</td><td>{bread, milk, diapers, beer}</td></tr>
+            <tr class="even:bg-slate-800/30"><td class="text-slate-600">[5]</td><td>{bread, milk, diapers, cola}</td></tr>
+        </tbody>
+    </table>`,
+    
+    // Association Rules: Rules
+    "rules": `
+    <table class="w-full text-left border-collapse data-table-restored">
+        <thead><tr class="text-blue-300 border-b border-slate-700"><th>lhs</th><th></th><th>rhs</th><th>support</th><th>confidence</th><th>lift</th></tr></thead>
+        <tbody class="text-slate-400 font-mono text-xs">
+            <tr><td>{milk}</td><td>=></td><td>{bread}</td><td>0.6</td><td>0.75</td><td>1.2</td></tr>
+            <tr><td>{beer}</td><td>=></td><td>{diapers}</td><td>0.4</td><td>1.00</td><td>1.4</td></tr>
+            <tr><td>{diapers}</td><td>=></td><td>{beer}</td><td>0.4</td><td>0.66</td><td>1.4</td></tr>
+            <tr><td>{bread}</td><td>=></td><td>{milk}</td><td>0.6</td><td>0.85</td><td>1.2</td></tr>
+        </tbody>
+    </table>`,
+
+    // Sequence Mining
+    "seqs": `
+    <div class="text-xs font-mono text-slate-400 mb-2">State Sequence Object (STS)</div>
+    <table class="w-full text-left border-collapse data-table-restored">
+        <thead><tr class="text-blue-300 border-b border-slate-700"><th>id</th><th>Sequence (t1-t5)</th></tr></thead>
+        <tbody class="text-slate-400 font-mono text-xs">
+            <tr class="even:bg-slate-800/30"><td class="text-slate-600">1</td><td>A-A-A-B-B</td></tr>
+            <tr class="even:bg-slate-800/30"><td class="text-slate-600">2</td><td>A-B-B-B-C</td></tr>
+            <tr class="even:bg-slate-800/30"><td class="text-slate-600">3</td><td>B-B-C-C-C</td></tr>
+            <tr class="even:bg-slate-800/30"><td class="text-slate-600">4</td><td>A-A-B-C-C</td></tr>
+        </tbody>
+    </table>`,
+
+    // Text Mining: DTM
+    "dtm": `
+    <div class="text-xs font-mono text-slate-400 mb-2"><<DocumentTermMatrix (documents: 4, terms: 5)>></div>
+    <table class="w-full text-left border-collapse data-table-restored">
+        <thead><tr class="text-blue-300 border-b border-slate-700"><th>Docs</th><th>data</th><th>mining</th><th>r</th><th>code</th><th>stats</th></tr></thead>
+        <tbody class="text-slate-400 font-mono text-xs">
+            <tr><td class="text-slate-600">1</td><td>1</td><td>1</td><td>0</td><td>0</td><td>0</td></tr>
+            <tr><td class="text-slate-600">2</td><td>0</td><td>1</td><td>1</td><td>0</td><td>0</td></tr>
+            <tr><td class="text-slate-600">3</td><td>1</td><td>0</td><td>0</td><td>1</td><td>1</td></tr>
+            <tr><td class="text-slate-600">4</td><td>0</td><td>0</td><td>1</td><td>1</td><td>1</td></tr>
+        </tbody>
+    </table>`
+};
+
+const campaigns = {
+  // --- EXISTING CAMPAIGNS ---
+  vectors: {
+    title: "1. Vector Operations",
+    consoleTitle: "Module 1: Vectors",
+    initialObjects: {},
+    levels: [
+      {
+        id: "vec_create",
+        type: "code",
+        title: "Atomic Construction",
+        desc: "Create a numeric vector named 'vals' containing 10, 20, and 30.",
+        skill: "Creation",
+        difficulty: 1,
+        timeLimit: 120,
+        solutionPatterns: [/vals\s*(<-|=)\s*c\(\s*10\s*,\s*20\s*,\s*30\s*\)/],
+        successOutput: "[1] 10 20 30",
+        hintSteps: [
+          "Use the fundamental combine function.",
+          "Use the form: `variable <- c(...)`",
+          "Try: `vals <- c(10, <n2>, <n3>)`"
+        ],
+        reveal: "vals <- c(10, 20, 30)",
+        explain: "The `c()` function (combine) creates a vector. Vectors are 1-dimensional arrays where all elements must be the same type (numeric, character, etc).",
+        syntax: "var <- c(val1, val2, ...)",
+        inputs: "Values (numbers, strings, logicals) separated by commas."
+      },
+      {
+        id: "vec_seq",
+        type: "code",
+        title: "Sequence Generation",
+        desc: "Create a sequence from 5 to 15 named 's'.",
+        skill: "Sequencing",
+        difficulty: 1,
+        timeLimit: 120,
+        solutionPatterns: [/s\s*(<-|=)\s*5:15/, /s\s*(<-|=)\s*seq\(\s*5\s*,\s*15\s*\)/, /s\s*(<-|=)\s*seq\(\s*from\s*=\s*5\s*,\s*to\s*=\s*15\s*\)/],
+        successOutput: " [1]  5  6  7  8  9 10 11 12 13 14 15",
+        hintSteps: [
+          "You can use the colon operator or a function.",
+          "Operator: `start:end` or Function: `seq(...)`",
+          "Try: `s <- 5:<n>`"
+        ],
+        reveal: "s <- 5:15",
+        explain: "The colon operator `:` allows quick generation of integer sequences. `seq(from, to, by)` offers more control.",
+        syntax: "start:end",
+        inputs: "A start integer and an end integer."
+      },
+      {
+        id: "vec_access",
+        type: "code",
+        title: "Positional Access",
+        desc: "Given vector 'x', extract the 2nd element.",
+        skill: "Indexing",
+        difficulty: 1,
+        timeLimit: 120,
+        preLoad: { x: "[10, 20, 30, 40, 50]" },
+        solutionPatterns: [/x\[2\]/],
+        successOutput: "[1] 20",
+        hintSteps: [
+          "Use square brackets for indexing.",
+          "Structure: `vector_name[...]`",
+          "Try: `x[<index>]`"
+        ],
+        reveal: "x[2]",
+        explain: "R uses 1-based indexing. `x[2]` retrieves the second item. This is unlike Python or C which start at 0.",
+        syntax: "vec[index]",
+        inputs: "The vector name and a positive integer index."
+      },
+      {
+        id: "vec_math",
+        type: "code",
+        title: "Vector Arithmetic",
+        desc: "Multiply all elements of vector 'x' by 2.",
+        skill: "Vectorization",
+        difficulty: 2,
+        timeLimit: 120,
+        preLoad: { x: "[1, 2, 3]" },
+        solutionPatterns: [/x\s*\*\s*2/],
+        successOutput: "[1] 2 4 6",
+        hintSteps: [
+          "R operations are vectorized by default.",
+          "Simply multiply the vector variable by the scalar.",
+          "Try: `x * <scalar>`"
+        ],
+        reveal: "x * 2",
+        explain: "R is vectorized. `x * 2` multiplies *every* element in `x` by 2 simultaneously, avoiding the need for explicit loops.",
+        syntax: "vec * scalar",
+        inputs: "A numeric vector and a single number (scalar)."
+      },
+      {
+        id: "vec_neg",
+        type: "code",
+        title: "Exclusion Indexing",
+        desc: "Select all elements of 'x' EXCEPT the 3rd one.",
+        skill: "Indexing",
+        difficulty: 2,
+        timeLimit: 120,
+        preLoad: { x: "[10, 20, 30, 40]" },
+        solutionPatterns: [/x\[-3\]/],
+        successOutput: "[1] 10 20 40",
+        hintSteps: [
+          "Negative indices remove elements.",
+          "Structure: `vector_name[-...]`",
+          "Try: `x[-<index_to_remove>]`"
+        ],
+        reveal: "x[-3]",
+        explain: "Negative indexing `x[-i]` returns the vector without the i-th element. It's a quick way to drop data points.",
+        syntax: "vec[-index]",
+        inputs: "A vector and a negative integer index."
+      }
+    ]
+  },
+
+  dataframes: {
+    title: "2. Data Structures",
+    consoleTitle: "Module 2: DataFrames",
+    initialObjects: {},
+    levels: [
+      {
+        id: "df_create",
+        type: "code",
+        title: "Frame Construction",
+        desc: "Create a data frame 'df' with column 'id' (1 to 5) and 'score' (10 to 50 by 10).",
+        skill: "Creation",
+        difficulty: 2,
+        timeLimit: 120,
+        solutionPatterns: [/df\s*(<-|=)\s*data\.frame\(\s*id\s*=\s*1:5\s*,\s*score\s*=\s*(seq\(10,\s*50,\s*10\)|c\(10,20,30,40,50\))\s*\)/],
+        successOutput: "  id score\n1  1    10\n2  2    20...",
+        hintSteps: [
+          "Use the standard constructor function.",
+          "Structure: `data.frame(col1=..., col2=...)`",
+          "Try: `data.frame(id=1:5, score=<vector>)`"
+        ],
+        reveal: "df <- data.frame(id=1:5, score=seq(10,50,10))",
+        explain: "`data.frame()` binds vectors together as columns. All vectors must have the same length. It's the standard table structure in R.",
+        syntax: "data.frame(tag=value, ...)",
+        inputs: "Vectors of equal length, named as column=values."
+      },
+      {
+        id: "df_str",
+        type: "code",
+        title: "Structure Check",
+        desc: "Check the structure of the dataframe 'df'.",
+        skill: "Inspection",
+        difficulty: 1,
+        timeLimit: 120,
+        preLoad: { df: "data.frame(id=1:5, val=runif(5))" },
+        solutionPatterns: [/str\(\s*df\s*\)/],
+        successOutput: "'data.frame':	5 obs. of  2 variables:\n $ id : int  1 2 3 4 5\n $ val: num  0.1 0.5 ...",
+        hintSteps: [
+          "Use the function that displays internal structure.",
+          "Function: `str(...)`",
+          "Try: `str(<object>)`"
+        ],
+        reveal: "str(df)",
+        explain: "`str()` (Structure) is the go-to function for checking object types. It shows you column names, data types (int, num, chr), and the first few values.",
+        syntax: "str(obj)",
+        inputs: "Any R object (dataframe, list, vector, etc)."
+      },
+      {
+        id: "df_col",
+        type: "code",
+        title: "Dollar Extraction",
+        desc: "Extract the 'age' column from dataframe 'users'.",
+        skill: "Access",
+        difficulty: 1,
+        timeLimit: 120,
+        preLoad: { users: "data.frame(name=c('A','B'), age=c(25,30))" },
+        solutionPatterns: [/users\$age/],
+        successOutput: "[1] 25 30",
+        hintSteps: [
+          "Use the dollar sign operator.",
+          "Structure: `dataframe$column`",
+          "Try: `users$<name>`"
+        ],
+        reveal: "users$age",
+        explain: "The `$` operator extracts a single column as a vector. It is the most common way to access variables in a dataset.",
+        syntax: "df$colName",
+        inputs: "A dataframe name and a valid column name."
+      },
+      {
+        id: "df_subset",
+        type: "code",
+        title: "Logical Subsetting",
+        desc: "Get all rows from 'df' where 'score' is greater than 80.",
+        skill: "Filtering",
+        difficulty: 3,
+        timeLimit: 120,
+        preLoad: { df: "data.frame(id=1:4, score=c(70, 85, 90, 60))" },
+        solutionPatterns: [/subset\(\s*df\s*,\s*score\s*>\s*80\s*\)/, /df\[\s*df\$score\s*>\s*80\s*,\s*\]/],
+        successOutput: "  id score\n2  2    85\n3  3    90",
+        hintSteps: [
+          "You can use the `subset` function or logical indexing.",
+          "Function: `subset(data, condition)`",
+          "Try: `subset(df, score > <n>)`"
+        ],
+        reveal: "subset(df, score > 80)",
+        explain: "`subset()` filters rows. Alternatively, `df[df$score > 80, ]` works, but `subset()` handles missing values (NA) more gracefully.",
+        syntax: "subset(df, logic)",
+        inputs: "A dataframe and a logical expression using column names."
+      },
+      {
+        id: "df_rowcol",
+        type: "code",
+        title: "Matrix Notation",
+        desc: "Select the value in the 1st row, 2nd column of 'df'.",
+        skill: "Indexing",
+        difficulty: 2,
+        timeLimit: 120,
+        preLoad: { df: "data.frame(A=1:3, B=4:6)" },
+        solutionPatterns: [/df\[\s*1\s*,\s*2\s*\]/],
+        successOutput: "[1] 4",
+        hintSteps: [
+          "Use 2D square bracket notation.",
+          "Structure: `[row_index, column_index]`",
+          "Try: `df[<r>, <c>]`"
+        ],
+        reveal: "df[1, 2]",
+        explain: "Dataframes have 2 dimensions: rows and columns. `df[row, col]` selects a specific value. `df[1, ]` selects the first row, `df[, 2]` the second column.",
+        syntax: "df[row, col]",
+        inputs: "Dataframe, row index, column index."
+      },
+      {
+        id: "df_ncol",
+        type: "code",
+        title: "Dimensions",
+        desc: "Find the number of columns in 'df'.",
+        skill: "Inspection",
+        difficulty: 1,
+        timeLimit: 120,
+        preLoad: { df: "data.frame(A=1, B=2, C=3)" },
+        solutionPatterns: [/ncol\(\s*df\s*\)/],
+        successOutput: "[1] 3",
+        hintSteps: [
+          "There is a specific function counting columns.",
+          "Function: `ncol(...)`",
+          "Try: `ncol(<object>)`"
+        ],
+        reveal: "ncol(df)",
+        explain: "`ncol()` returns column count. `nrow()` returns row count. `dim()` returns both as a vector c(rows, cols).",
+        syntax: "ncol(df)",
+        inputs: "A dataframe or matrix."
+      }
+    ]
+  },
+
+  wrangling: {
+    title: "3. Tidyverse Wrangling",
+    consoleTitle: "Module 3: Dplyr Ops",
+    initialObjects: {},
+    levels: [
+      {
+        id: "dp_select",
+        type: "code",
+        title: "Select Columns",
+        desc: "Use dplyr to select only 'name' and 'age' from 'people'.",
+        skill: "Selection",
+        difficulty: 2,
+        timeLimit: 120,
+        preLoad: { people: "data.frame(name='A', age=20, city='NY')" },
+        solutionPatterns: [/select\(\s*people\s*,\s*name\s*,\s*age\s*\)/, /people\s*%>\%\s*select\(\s*name\s*,\s*age\s*\)/],
+        successOutput: "  name age\n1    A  20",
+        hintSteps: [
+          "The verb is `select`.",
+          "Structure: `select(data, col1, col2)`",
+          "Try: `select(people, <c1>, <c2>)`"
+        ],
+        reveal: "select(people, name, age)",
+        explain: "`select()` reduces the width of your dataset by keeping only specific columns. It is part of the dplyr package.",
+        syntax: "select(df, col...)",
+        inputs: "Dataframe and column names (unquoted)."
+      },
+      {
+        id: "dp_filter",
+        type: "code",
+        title: "Filter Rows",
+        desc: "Keep rows in 'cars' where 'mpg' is greater than 20.",
+        skill: "Filtering",
+        difficulty: 2,
+        timeLimit: 120,
+        preLoad: { cars: "data.frame(model='X', mpg=25)" },
+        solutionPatterns: [/filter\(\s*cars\s*,\s*mpg\s*>\s*20\s*\)/, /cars\s*%>\%\s*filter\(\s*mpg\s*>\s*20\s*\)/],
+        successOutput: "  model mpg\n1     X  25",
+        hintSteps: [
+          "The verb is `filter`.",
+          "Structure: `filter(data, logical_test)`",
+          "Try: `filter(cars, mpg > <n>)`"
+        ],
+        reveal: "filter(cars, mpg > 20)",
+        explain: "`filter()` reduces the length of your dataset by keeping rows that satisfy a logical condition.",
+        syntax: "filter(df, cond)",
+        inputs: "Dataframe and a logical condition."
+      },
+      {
+        id: "dp_mutate",
+        type: "code",
+        title: "Mutate Columns",
+        desc: "Add a new column 'double_x' to 'df' that is x multiplied by 2.",
+        skill: "Transformation",
+        difficulty: 3,
+        timeLimit: 120,
+        preLoad: { df: "data.frame(x=10)" },
+        solutionPatterns: [/mutate\(\s*df\s*,\s*double_x\s*=\s*x\s*\*\s*2\s*\)/, /df\s*%>\%\s*mutate\(\s*double_x\s*=\s*x\s*\*\s*2\s*\)/],
+        successOutput: "   x double_x\n1 10       20",
+        hintSteps: [
+          "The verb is `mutate`.",
+          "Structure: `mutate(data, new_col = expression)`",
+          "Try: `mutate(df, double_x = x * <n>)`"
+        ],
+        reveal: "mutate(df, double_x = x * 2)",
+        explain: "`mutate()` creates new variables or modifies existing ones. The math is done row-by-row (vectorized).",
+        syntax: "mutate(df, new=eq)",
+        inputs: "Dataframe and new_col = expression."
+      },
+      {
+        id: "dp_summ",
+        type: "code",
+        title: "Summarisation",
+        desc: "Calculate the mean of 'amt' in 'sales' as a summary named 'avg'.",
+        skill: "Aggregation",
+        difficulty: 3,
+        timeLimit: 120,
+        preLoad: { sales: "data.frame(amt=c(100,200))" },
+        solutionPatterns: [/summarise\(\s*sales\s*,\s*avg\s*=\s*mean\(\s*amt\s*\)\s*\)/, /sales\s*%>\%\s*summarise\(\s*avg\s*=\s*mean\(\s*amt\s*\)\s*\)/, /summarize\(\s*sales\s*,\s*avg\s*=\s*mean\(\s*amt\s*\)\s*\)/],
+        successOutput: "  avg\n1 150",
+        hintSteps: [
+          "The verb is `summarise` (or summarize).",
+          "Structure: `summarise(data, summary_name = function(col))`",
+          "Try: `summarise(sales, avg = mean(<col>))`"
+        ],
+        reveal: "summarise(sales, avg = mean(amt))",
+        explain: "`summarise()` collapses a dataframe into a single row of summary statistics. It is often paired with `group_by()`.",
+        syntax: "summarise(df, out=func)",
+        inputs: "Dataframe and summary definitions."
+      },
+      {
+        id: "dp_pipe",
+        type: "code",
+        title: "The Pipe",
+        desc: "Pipe 'df' into the 'head' function showing 2 rows.",
+        skill: "Piping",
+        difficulty: 2,
+        timeLimit: 120,
+        preLoad: { df: "data.frame(x=1:10)" },
+        solutionPatterns: [/df\s*%>\%\s*head\(\s*2\s*\)/, /df\s*\|>\s*head\(\s*2\s*\)/],
+        successOutput: "  x\n1 1\n2 2",
+        hintSteps: [
+          "Use the pipe operator `%>%` or `|>`.",
+          "Structure: `data %>% function(args)`",
+          "Try: `df %>% head(<n>)`"
+        ],
+        reveal: "df %>% head(2)",
+        explain: "The pipe `%>%` (magrittr) or `|>` (native R) passes the result of the left side as the first argument to the right side function. It makes code read like a sentence.",
+        syntax: "obj %>% func",
+        inputs: "LHS object and RHS function."
+      }
+    ]
+  },
+
+  stats: {
+    title: "4. Statistical Base",
+    consoleTitle: "Module 4: Statistics",
+    initialObjects: {},
+    levels: [
+      {
+        id: "st_mean",
+        type: "code",
+        title: "Central Tendency",
+        desc: "Calculate the mean of vector 'vals'.",
+        skill: "Stats",
+        difficulty: 1,
+        timeLimit: 120,
+        preLoad: { vals: "[2, 4, 6, 8]" },
+        solutionPatterns: [/mean\(\s*vals\s*\)/],
+        successOutput: "[1] 5",
+        hintSteps: [
+          "Use the standard average function.",
+          "Function: `mean(...)`",
+          "Try: `mean(<vec>)`"
+        ],
+        reveal: "mean(vals)",
+        explain: "`mean()` calculates the arithmetic average. It is sensitive to extreme values.",
+        syntax: "mean(x)",
+        inputs: "A numeric vector."
+      },
+      {
+        id: "st_median",
+        type: "code",
+        title: "The Median",
+        desc: "Find the median value of 'vals'.",
+        skill: "Stats",
+        difficulty: 1,
+        timeLimit: 120,
+        preLoad: { vals: "[1, 10, 100]" },
+        solutionPatterns: [/median\(\s*vals\s*\)/],
+        successOutput: "[1] 10",
+        hintSteps: [
+          "Use the middle-value function.",
+          "Function: `median(...)`",
+          "Try: `median(<vec>)`"
+        ],
+        reveal: "median(vals)",
+        explain: "`median()` finds the middle value when data is sorted. It is robust to outliers.",
+        syntax: "median(x)",
+        inputs: "A numeric vector."
+      },
+      {
+        id: "st_sd",
+        type: "code",
+        title: "Standard Deviation",
+        desc: "Calculate standard deviation of 'x'.",
+        skill: "Stats",
+        difficulty: 1,
+        timeLimit: 120,
+        preLoad: { x: "[2, 4, 4, 4, 5, 5, 7, 9]" },
+        solutionPatterns: [/sd\(\s*x\s*\)/],
+        successOutput: "[1] 2.138",
+        hintSteps: [
+          "Use the SD function.",
+          "Function: `sd(...)`",
+          "Try: `sd(<vec>)`"
+        ],
+        reveal: "sd(x)",
+        explain: "`sd()` measures the spread of data. A high SD means data points are spread over a wider range of values.",
+        syntax: "sd(x)",
+        inputs: "A numeric vector."
+      },
+      {
+        id: "st_summary",
+        type: "code",
+        title: "Quick Summary",
+        desc: "Get the summary statistics for dataframe 'df'.",
+        skill: "Inspection",
+        difficulty: 1,
+        timeLimit: 120,
+        preLoad: { df: "data.frame(a=1:10)" },
+        solutionPatterns: [/summary\(\s*df\s*\)/],
+        successOutput: "Min. 1st Qu. Median Mean 3rd Qu. Max.",
+        hintSteps: [
+          "Use the generic summary function.",
+          "Function: `summary(...)`",
+          "Try: `summary(<object>)`"
+        ],
+        reveal: "summary(df)",
+        explain: "`summary()` gives a quick overview: min, max, mean, and quartiles for numeric data, and frequency counts for factors.",
+        syntax: "summary(obj)",
+        inputs: "Any R object."
+      },
+      {
+        id: "st_lm",
+        type: "code",
+        title: "Linear Model",
+        desc: "Fit a linear model predicting 'y' from 'x' using dataset 'data'.",
+        skill: "Modelling",
+        difficulty: 4,
+        timeLimit: 120,
+        preLoad: { data: "data.frame(x=1:5, y=2:6)" },
+        solutionPatterns: [/lm\(\s*y\s*~\s*x\s*,\s*data\s*=\s*data\s*\)/, /lm\(\s*data\$y\s*~\s*data\$x\s*\)/],
+        successOutput: "\nCall:\nlm(formula = y ~ x, data = data)\n\nCoefficients:\n(Intercept)            x  \n          1            1  ",
+        hintSteps: [
+          "Use the linear model function.",
+          "Structure: `lm(formula, data=...)`",
+          "Try: `lm(y ~ <predictor>, data=<df>)`"
+        ],
+        reveal: "lm(y ~ x, data=data)",
+        explain: "`lm()` fits a linear regression model. The tilde `~` reads as 'modeled by'. So `y ~ x` means 'predict y using x'.",
+        syntax: "lm(y ~ x, data=df)",
+        inputs: "Formula (y ~ x) and a data argument."
+      }
+    ]
+  },
+
+  sigmaChallenge: {
+    title: "5. SIGMA Challenge (Workshop)",
+    consoleTitle: "Protocol: SIGMA_WORKSHOP",
+    initialObjects: { 
+        "obesity": "37 obs. of 12 variables",
+        "pretest": "num [1:6] 0.19 0.23...",
+        "posttest": "num [1:6] 0.15 0.20..."
+    },
+    levels: [
+      {
+        id: "sigma_vec",
+        type: "code",
+        title: "Vector Diff",
+        desc: "Calculate the difference between 'posttest' and 'pretest' and store it in 'diff'.",
+        skill: "Vector Math",
+        difficulty: 2,
+        timeLimit: 120,
+        solutionPatterns: [/diff\s*(<-|=)\s*posttest\s*-\s*pretest/],
+        successOutput: "# diff created\n[1] -0.04 -0.03 ...",
+        hintSteps: ["Subtract pretest from posttest.", "Try: `diff <- posttest - ...`"],
+        reveal: "diff <- posttest - pretest",
+        explain: "R performs element-wise subtraction. Each element of `pretest` is subtracted from the corresponding element of `posttest`.",
+        syntax: "v1 - v2",
+        inputs: "Two numeric vectors."
+      },
+      {
+        id: "sigma_mean",
+        type: "code",
+        title: "Stats: Diff Mean",
+        desc: "Calculate the mean of the 'diff' object you just created.",
+        skill: "Mean",
+        difficulty: 1,
+        timeLimit: 120,
+        preLoad: { diff: "[-0.04, -0.03, -0.01]" }, 
+        solutionPatterns: [/mean\(\s*diff\s*\)/],
+        successOutput: "[1] -0.045",
+        hintSteps: ["Use the mean function.", "Apply `mean()` to your new object."],
+        reveal: "mean(diff)",
+        explain: "This gives you the average improvement (or decline) across all subjects.",
+        syntax: "mean(x)",
+        inputs: "Numeric vector."
+      },
+      {
+        id: "sigma_summ",
+        type: "code",
+        title: "Obesity Summary",
+        desc: "Get a summary of the 'weightweek8' column from the 'obesity' dataframe.",
+        skill: "Summary",
+        difficulty: 2,
+        timeLimit: 120,
+        solutionPatterns: [/summary\(\s*obesity\$weightweek8\s*\)/],
+        successOutput: "Min. 1st Qu. Median Mean ...",
+        hintSteps: ["Access column with $.", "Try: `summary(obesity$...)`"],
+        reveal: "summary(obesity$weightweek8)",
+        explain: "Using `$` targets the specific column `weightweek8`. Summary gives the distribution details.",
+        syntax: "summary(df$col)",
+        inputs: "Dataframe column."
+      },
+      {
+        id: "sigma_tapply_mean",
+        type: "code",
+        title: "Group Means (tapply)",
+        desc: "Use `tapply` to find mean 'weightchange' by 'treatgroup' in the obesity dataset.",
+        skill: "tapply",
+        difficulty: 4,
+        timeLimit: 150,
+        solutionPatterns: [/tapply\(\s*obesity\$weightchange\s*,\s*obesity\$treatgroup\s*,\s*mean\s*\)/],
+        successOutput: "    1     2 \n-1.36 -5.01",
+        hintSteps: ["`tapply(X, INDEX, FUN)`", "Structure: `tapply(vector, group, mean)`"],
+        reveal: "tapply(obesity$weightchange, obesity$treatgroup, mean)",
+        explain: "`tapply` (tagged apply) splits the data (first arg) into groups (second arg), applies the function (third arg) to each group, and returns the results.",
+        syntax: "tapply(x, g, fun)",
+        inputs: "Vector, Grouping, Function."
+      },
+      {
+        id: "sigma_cross",
+        type: "code",
+        title: "Cross-Tabulation",
+        desc: "Create a table of 'treatgroup' vs 'ageonset' from the obesity dataset.",
+        skill: "Table",
+        difficulty: 2,
+        timeLimit: 120,
+        solutionPatterns: [/table\(\s*obesity\$treatgroup\s*,\s*obesity\$ageonset\s*\)/],
+        successOutput: "   Young Old\n1     10   9\n2      8  10",
+        hintSteps: ["`table(row, col)`", "Structure: `table(row_var, col_var)`"],
+        reveal: "table(obesity$treatgroup, obesity$ageonset)",
+        explain: "`table()` creates a contingency table (crosstab) counting how many observations fall into each combination of categories.",
+        syntax: "table(x, y)",
+        inputs: "Two factors."
+      }
+    ]
+  },
+
+  // --- EXPANSION CHAPTERS ---
+
+  clusteringAnomaly: {
+    title: "6. Clustering & Anomaly",
+    consoleTitle: "Module 6: Unsupervised",
+    initialObjects: {},
+    levels: [
+      {
+        id: "clu_kmeans",
+        type: "code",
+        title: "K-Means Clustering",
+        desc: "Perform k-means clustering on 'df' with 3 centers.",
+        skill: "Clustering",
+        difficulty: 3,
+        timeLimit: 120,
+        preLoad: { df: "data.frame(x=rnorm(10), y=rnorm(10))" },
+        solutionPatterns: [/kmeans\(\s*df\s*,\s*(centers\s*=\s*)?3\s*\)/],
+        successOutput: "K-means clustering with 3 clusters of sizes 3, 4, 3\n\nCluster means:\n...",
+        hintSteps: [
+          "Use the standard k-means function.",
+          "Function: `kmeans(data, centers=...)`",
+          "Try: `kmeans(df, centers=<n>)`"
+        ],
+        reveal: "kmeans(df, centers=3)",
+        explain: "K-Means partitions data into k groups by minimizing the sum of squares. It finds 'k' centroids and assigns points to the nearest one.",
+        syntax: "kmeans(x, centers)",
+        inputs: "Numeric matrix/df and k (integer)."
+      },
+      {
+        id: "clu_pam",
+        type: "code",
+        title: "PAM / Medoids",
+        desc: "Use Partitioning Around Medoids (PAM) on 'df' with k=3.",
+        skill: "Clustering",
+        difficulty: 4,
+        timeLimit: 120,
+        preLoad: { df: "data.frame(x=1:10, y=1:10)" },
+        solutionPatterns: [/pam\(\s*df\s*,\s*(k\s*=\s*)?3\s*\)/],
+        successOutput: "Medoids:\n     ID   x   y\n[1,]  2   2   2...",
+        hintSteps: [
+          "Robust alternative to k-means.",
+          "Function: `pam(data, k=...)`",
+          "Try: `pam(df, k=<n>)`"
+        ],
+        reveal: "pam(df, k=3)",
+        explain: "PAM is like K-Means but uses actual data points (medoids) as centers. This makes it more robust to outliers than K-Means.",
+        syntax: "pam(x, k)",
+        inputs: "Numeric matrix/df and k."
+      },
+      {
+        id: "clu_dist",
+        type: "code",
+        title: "Distance Matrix",
+        desc: "Calculate the Euclidean distance matrix for 'df'.",
+        skill: "Metrics",
+        difficulty: 2,
+        timeLimit: 120,
+        preLoad: { df: "data.frame(x=c(1,5), y=c(1,5))" },
+        solutionPatterns: [/dist\(\s*df\s*\)/],
+        successOutput: "         1\n2 5.656854",
+        hintSteps: [
+          "Compute distances between rows.",
+          "Function: `dist(...)`",
+          "Try: `dist(<data>)`"
+        ],
+        reveal: "dist(df)",
+        explain: "`dist()` calculates the distance (default Euclidean) between every pair of rows in the dataset, creating a triangular matrix.",
+        syntax: "dist(x)",
+        inputs: "Numeric matrix/df."
+      },
+      {
+        id: "clu_hclust",
+        type: "code",
+        title: "Hierarchical Cluster",
+        desc: "Perform hierarchical clustering on distance object 'd'.",
+        skill: "Clustering",
+        difficulty: 3,
+        timeLimit: 120,
+        preLoad: { d: "dist(data.frame(x=1:5))" },
+        solutionPatterns: [/hclust\(\s*d\s*\)/],
+        successOutput: "\nCall:\nhclust(d = d)\n\nCluster method   : complete \nDistance         : euclidean ",
+        hintSteps: [
+          "Build a hierarchy from distances.",
+          "Function: `hclust(...)`",
+          "Try: `hclust(<dist_obj>)`"
+        ],
+        reveal: "hclust(d)",
+        explain: "`hclust` builds a tree structure (dendrogram) from the distance matrix. It merges the closest pairs iteratively.",
+        syntax: "hclust(d)",
+        inputs: "Distance matrix (from dist)."
+      },
+      {
+        id: "clu_outlier",
+        type: "code",
+        title: "Boxplot Outliers",
+        desc: "Extract outlier values from vector 'x' using boxplot.stats.",
+        skill: "Anomaly",
+        difficulty: 4,
+        timeLimit: 120,
+        preLoad: { x: "c(1:10, 100)" },
+        solutionPatterns: [/boxplot\.stats\(\s*x\s*\)\$out/],
+        successOutput: "[1] 100",
+        hintSteps: [
+          "Access the statistics generated for a boxplot.",
+          "Structure: `boxplot.stats(vec)$component`",
+          "Try: `boxplot.stats(x)$<name>`"
+        ],
+        reveal: "boxplot.stats(x)$out",
+        explain: "Boxplot statistics define outliers as points beyond 1.5 * IQR from the quartiles. This command extracts those specific values.",
+        syntax: "boxplot.stats(x)$out",
+        inputs: "Numeric vector."
+      }
+    ]
+  },
+
+  associationRules: {
+    title: "7. Association Rules",
+    consoleTitle: "Module 7: Market Basket",
+    initialObjects: { "transactions": "sparse matrix" },
+    levels: [
+      {
+        id: "ar_lib",
+        type: "code",
+        title: "Load Library",
+        desc: "Load the 'arules' package.",
+        skill: "Setup",
+        difficulty: 1,
+        timeLimit: 120,
+        solutionPatterns: [/library\(\s*arules\s*\)/, /require\(\s*arules\s*\)/],
+        successOutput: "Loading required package: arules...",
+        hintSteps: [
+          "Load the association rules package.",
+          "Function: `library(...)`",
+          "Try: `library(<pkg_name>)`"
+        ],
+        reveal: "library(arules)",
+        explain: "In R, external packages must be loaded into the session using `library()` before their functions can be used.",
+        syntax: "library(pkg)",
+        inputs: "Package name."
+      },
+      {
+        id: "ar_apriori",
+        type: "code",
+        title: "Apriori Algorithm",
+        desc: "Run 'apriori' on 'transactions' with default settings.",
+        skill: "Mining",
+        difficulty: 3,
+        timeLimit: 120,
+        preLoad: { transactions: "transactions object" },
+        solutionPatterns: [/apriori\(\s*transactions\s*\)/],
+        successOutput: "Apriori\nParameter specification:\n confidence minval smax arem  aval originalSupport maxtime support\n        0.8    0.1    1 none FALSE            TRUE       5     0.1",
+        hintSteps: [
+          "The main function for frequent itemsets.",
+          "Function: `apriori(...)`",
+          "Try: `apriori(<data>)`"
+        ],
+        reveal: "apriori(transactions)",
+        explain: "The Apriori algorithm finds frequent itemsets and generates association rules (if X, then Y) based on support and confidence.",
+        syntax: "apriori(data)",
+        inputs: "Transactions object."
+      },
+      {
+        id: "ar_inspect",
+        type: "code",
+        title: "Inspect Rules",
+        desc: "View the contents of the 'rules' object.",
+        skill: "Inspection",
+        difficulty: 2,
+        timeLimit: 120,
+        preLoad: { rules: "set of 5 rules" },
+        solutionPatterns: [/inspect\(\s*rules\s*\)/],
+        successOutput: "    lhs    rhs   support confidence coverage lift count\n[1] {A} => {B}   0.5     1.0        0.5      2    5  ",
+        hintSteps: [
+          "Standard print functions don't work well on rules.",
+          "Function: `inspect(...)`",
+          "Try: `inspect(<obj>)`"
+        ],
+        reveal: "inspect(rules)",
+        explain: "Rules are stored as complex objects. `inspect()` prints them in a readable tabular format showing LHS, RHS, and metrics.",
+        syntax: "inspect(rules)",
+        inputs: "Rules or itemsets object."
+      },
+      {
+        id: "ar_sort",
+        type: "code",
+        title: "Sort by Lift",
+        desc: "Sort 'rules' by 'lift'.",
+        skill: "Ordering",
+        difficulty: 3,
+        timeLimit: 120,
+        preLoad: { rules: "rules object" },
+        solutionPatterns: [/sort\(\s*rules\s*,\s*by\s*=\s*("lift"|'lift')\s*\)/],
+        successOutput: "set of rules sorted by lift",
+        hintSteps: [
+          "Order the rules based on a metric.",
+          "Structure: `sort(rules, by='metric')`",
+          "Try: `sort(rules, by='<metric_name>')`"
+        ],
+        reveal: "sort(rules, by='lift')",
+        explain: "Sorting helps identify the most interesting rules. 'Lift' measures how much more likely X and Y co-occur than by chance.",
+        syntax: "sort(rules, by=...)",
+        inputs: "Rules object and metric string."
+      },
+      {
+        id: "ar_plot",
+        type: "code",
+        title: "Item Frequency",
+        desc: "Plot item frequencies for 'trans'.",
+        skill: "Visuals",
+        difficulty: 3,
+        timeLimit: 120,
+        preLoad: { trans: "transactions" },
+        solutionPatterns: [/itemFrequencyPlot\(\s*trans\s*\)/],
+        successOutput: "[Plot generated]",
+        hintSteps: [
+          "Visualize how often items appear.",
+          "Function: `itemFrequencyPlot(...)`",
+          "Try: `itemFrequencyPlot(<data>)`"
+        ],
+        reveal: "itemFrequencyPlot(trans)",
+        explain: "Visualises which items appear most frequently in the transaction dataset, usually as a bar chart.",
+        syntax: "itemFrequencyPlot(x)",
+        inputs: "Transactions object."
+      }
+    ]
+  },
+
+  sequenceMining: {
+    title: "8. Sequence Mining",
+    consoleTitle: "Module 8: TraMineR",
+    initialObjects: { "seqs": "Sequence Object" },
+    levels: [
+      {
+        id: "seq_def",
+        type: "code",
+        title: "Define Sequence",
+        desc: "Create a state sequence object from 'data' using `seqdef`.",
+        skill: "Creation",
+        difficulty: 3,
+        timeLimit: 120,
+        preLoad: { data: "raw sequence data" },
+        solutionPatterns: [/seqdef\(\s*data\s*\)/],
+        successOutput: " [>] state sequence object created",
+        hintSteps: [
+          "Convert raw data into a TraMineR sequence.",
+          "Function: `seqdef(...)`",
+          "Try: `seqdef(<df>)`"
+        ],
+        reveal: "seqdef(data)",
+        explain: "`seqdef()` is the constructor for TraMineR. It defines the alphabet (distinct states) and colors for the sequence object.",
+        syntax: "seqdef(data)",
+        inputs: "Dataframe of state sequences."
+      },
+      {
+        id: "seq_plot",
+        type: "code",
+        title: "Distribution Plot",
+        desc: "Plot the state distribution of 'seqs' using `seqdplot`.",
+        skill: "Visuals",
+        difficulty: 2,
+        timeLimit: 120,
+        preLoad: { seqs: "sequence object" },
+        solutionPatterns: [/seqdplot\(\s*seqs\s*\)/],
+        successOutput: "[State distribution plot generated]",
+        hintSteps: [
+          "Visualize the state distribution.",
+          "Function: `seqdplot(...)`",
+          "Try: `seqdplot(<obj>)`"
+        ],
+        reveal: "seqdplot(seqs)",
+        explain: "A distribution plot stacks the states at each time point, showing the aggregate proportion of people in each state over time.",
+        syntax: "seqdplot(seq)",
+        inputs: "State sequence object."
+      },
+      {
+        id: "seq_dist",
+        type: "code",
+        title: "LCS Distance",
+        desc: "Compute sequence distances using 'LCS' method on 'seqs'.",
+        skill: "Metrics",
+        difficulty: 4,
+        timeLimit: 120,
+        preLoad: { seqs: "sequence object" },
+        solutionPatterns: [/seqdist\(\s*seqs\s*,\s*method\s*=\s*("LCS"|'LCS')\s*\)/],
+        successOutput: "[Distance matrix 10x10]",
+        hintSteps: [
+          "Calculate dissimilarity between sequences.",
+          "Function: `seqdist(obj, method='...')`",
+          "Try: `seqdist(seqs, method='<method>')`"
+        ],
+        reveal: "seqdist(seqs, method='LCS')",
+        explain: "Calculates a matrix of pairwise distances. LCS (Longest Common Subsequence) measures similarity based on the length of shared sub-patterns.",
+        syntax: "seqdist(seq, method)",
+        inputs: "State sequence object and method string."
+      },
+      {
+        id: "seq_freq",
+        type: "code",
+        title: "Freq Plot",
+        desc: "Plot the most frequent sequences in 'seqs' using `seqfplot`.",
+        skill: "Visuals",
+        difficulty: 2,
+        timeLimit: 120,
+        preLoad: { seqs: "sequence object" },
+        solutionPatterns: [/seqfplot\(\s*seqs\s*\)/],
+        successOutput: "[Frequency plot generated]",
+        hintSteps: [
+          "Visualize the top patterns.",
+          "Function: `seqfplot(...)`",
+          "Try: `seqfplot(<obj>)`"
+        ],
+        reveal: "seqfplot(seqs)",
+        explain: "Displays the 10 most common full sequences in the dataset, ordered by their frequency.",
+        syntax: "seqfplot(seq)",
+        inputs: "State sequence object."
+      },
+      {
+        id: "seq_trans",
+        type: "code",
+        title: "Transition Rates",
+        desc: "Compute transition rates for 'seqs' using `seqtrate`.",
+        skill: "Analysis",
+        difficulty: 3,
+        timeLimit: 120,
+        preLoad: { seqs: "sequence object" },
+        solutionPatterns: [/seqtrate\(\s*seqs\s*\)/],
+        successOutput: "       [-> A] [-> B]\n[A ->]   0.8    0.2\n[B ->]   0.1    0.9",
+        hintSteps: [
+          "Calculate probability of moving between states.",
+          "Function: `seqtrate(...)`",
+          "Try: `seqtrate(<obj>)`"
+        ],
+        reveal: "seqtrate(seqs)",
+        explain: "Computes the probabilities of transitioning from one state to another (e.g., from 'School' to 'Work') between time steps.",
+        syntax: "seqtrate(seq)",
+        inputs: "State sequence object."
+      }
+    ]
+  },
+
+  textMining: {
+    title: "9. Text Mining",
+    consoleTitle: "Module 9: Text Analytics",
+    initialObjects: { "dtm": "Document Term Matrix" },
+    levels: [
+      {
+        id: "tm_corpus",
+        type: "code",
+        title: "Create Corpus",
+        desc: "Create a Corpus from VectorSource 'v'.",
+        skill: "Setup",
+        difficulty: 3,
+        timeLimit: 120,
+        preLoad: { v: "VectorSource" },
+        solutionPatterns: [/Corpus\(\s*v\s*\)/],
+        successOutput: "<<SimpleCorpus>>\nMetadata:  corpus specific: 1, document level (indexed): 0\nContent:  documents: 5",
+        hintSteps: [
+          "The main text container in tm.",
+          "Function: `Corpus(...)`",
+          "Try: `Corpus(<source>)`"
+        ],
+        reveal: "Corpus(v)",
+        explain: "A Corpus is the fundamental data structure in text mining. It collects text documents along with metadata in a structured list.",
+        syntax: "Corpus(source)",
+        inputs: "Source object (e.g., VectorSource)."
+      },
+      {
+        id: "tm_lower",
+        type: "code",
+        title: "Lowercase",
+        desc: "Transform 'corp' to lowercase using `tm_map` and `content_transformer(tolower)`.",
+        skill: "Cleaning",
+        difficulty: 4,
+        timeLimit: 120,
+        preLoad: { corp: "Corpus" },
+        solutionPatterns: [/tm_map\(\s*corp\s*,\s*content_transformer\(\s*tolower\s*\)\s*\)/],
+        successOutput: "<<SimpleCorpus>> (lowercased)",
+        hintSteps: [
+          "Apply a function to all documents.",
+          "Structure: `tm_map(data, content_transformer(func))`",
+          "Try: `tm_map(corp, content_transformer(<func>))`"
+        ],
+        reveal: "tm_map(corp, content_transformer(tolower))",
+        explain: "Standardizes text to lowercase so 'Apple' and 'apple' are counted as the same word. `tm_map` applies the function to every doc.",
+        syntax: "tm_map(corp, func)",
+        inputs: "Corpus and transformation function."
+      },
+      {
+        id: "tm_stop",
+        type: "code",
+        title: "Remove Stopwords",
+        desc: "Remove english stopwords from 'corp' using `tm_map`.",
+        skill: "Cleaning",
+        difficulty: 3,
+        timeLimit: 120,
+        preLoad: { corp: "Corpus" },
+        solutionPatterns: [/tm_map\(\s*corp\s*,\s*removeWords\s*,\s*stopwords\(\s*("en"|'en'|"english"|'english')\s*\)\s*\)/],
+        successOutput: "<<SimpleCorpus>> (stopwords removed)",
+        hintSteps: [
+          "Remove common words (the, is, at).",
+          "Structure: `tm_map(corp, removeWords, list_of_words)`",
+          "Try: `tm_map(corp, removeWords, stopwords('<lang>'))`"
+        ],
+        reveal: "tm_map(corp, removeWords, stopwords('en'))",
+        explain: "Stopwords are common words (the, and, is) that carry little meaning. Removing them reduces noise in the data.",
+        syntax: "tm_map(c, removeWords, list)",
+        inputs: "Corpus, command, word list."
+      },
+      {
+        id: "tm_dtm",
+        type: "code",
+        title: "Doc-Term Matrix",
+        desc: "Create a DocumentTermMatrix from 'corp'.",
+        skill: "Modeling",
+        difficulty: 2,
+        timeLimit: 120,
+        preLoad: { corp: "Corpus" },
+        solutionPatterns: [/DocumentTermMatrix\(\s*corp\s*\)/],
+        successOutput: "<<DocumentTermMatrix (documents: 5, terms: 10)>>\nNon-/sparse entries: 15/35",
+        hintSteps: [
+          "Convert corpus to a matrix of counts.",
+          "Function: `DocumentTermMatrix(...)`",
+          "Try: `DocumentTermMatrix(<obj>)`"
+        ],
+        reveal: "DocumentTermMatrix(corp)",
+        explain: "Converts the corpus into a mathematical matrix where rows are documents and columns are words (terms). The cells contain word counts.",
+        syntax: "DocumentTermMatrix(c)",
+        inputs: "Corpus object."
+      },
+      {
+        id: "tm_assoc",
+        type: "code",
+        title: "Find Assocs",
+        desc: "Find associations in 'dtm' for term 'data' with cor limit 0.7.",
+        skill: "Analysis",
+        difficulty: 4,
+        timeLimit: 120,
+        preLoad: { dtm: "DTM" },
+        solutionPatterns: [/findAssocs\(\s*dtm\s*,\s*("data"|'data')\s*,\s*0\.7\s*\)/],
+        successOutput: "$data\n  mining  science \n    0.85     0.75 ",
+        hintSteps: [
+          "Find terms correlated with a target.",
+          "Function: `findAssocs(dtm, term, corlimit)`",
+          "Try: `findAssocs(dtm, '<term>', <limit>)`"
+        ],
+        reveal: "findAssocs(dtm, 'data', 0.7)",
+        explain: "Checks the correlation between term frequency vectors. It reveals which words tend to appear together with your target word.",
+        syntax: "findAssocs(dtm, term, lim)",
+        inputs: "DTM, term string, correlation limit."
+      }
+    ]
+  },
+
+  visualizationBay: {
+    title: "10. Visualization Bay",
+    consoleTitle: "Module 10: Base Graphics",
+    initialObjects: {},
+    levels: [
+      {
+        id: "viz_plot",
+        type: "code",
+        title: "Scatter Plot",
+        desc: "Create a standard plot of 'x' vs 'y'.",
+        skill: "Plotting",
+        difficulty: 1,
+        timeLimit: 120,
+        preLoad: { x: "1:10", y: "1:10" },
+        solutionPatterns: [/plot\(\s*x\s*,\s*y\s*\)/],
+        successOutput: "[Scatter plot generated in quartz window]",
+        hintSteps: [
+          "The generic plotting function.",
+          "Function: `plot(...)`",
+          "Try: `plot(<x_var>, <y_var>)`"
+        ],
+        reveal: "plot(x, y)",
+        explain: "`plot()` is the primary generic function for plotting in R. With two numeric vectors, it produces a scatter plot.",
+        syntax: "plot(x, y)",
+        inputs: "Two numeric vectors of equal length."
+      },
+      {
+        id: "viz_hist",
+        type: "code",
+        title: "Histogram",
+        desc: "Create a histogram of vector 'x'.",
+        skill: "Plotting",
+        difficulty: 1,
+        timeLimit: 120,
+        preLoad: { x: "rnorm(100)" },
+        solutionPatterns: [/hist\(\s*x\s*\)/],
+        successOutput: "[Histogram generated]",
+        hintSteps: [
+          "Visualize distribution density.",
+          "Function: `hist(...)`",
+          "Try: `hist(<vec>)`"
+        ],
+        reveal: "hist(x)",
+        explain: "`hist()` computes a histogram of the given data values, visualising the frequency distribution in bins.",
+        syntax: "hist(x)",
+        inputs: "Numeric vector."
+      },
+      {
+        id: "viz_box",
+        type: "code",
+        title: "Boxplot",
+        desc: "Create a boxplot of 'y' grouped by 'group'.",
+        skill: "Plotting",
+        difficulty: 2,
+        timeLimit: 120,
+        preLoad: { y: "values", group: "factors" },
+        solutionPatterns: [/boxplot\(\s*y\s*~\s*group\s*\)/],
+        successOutput: "[Box-and-whisker plot generated]",
+        hintSteps: [
+          "Visualise quartiles and outliers.",
+          "Structure: `boxplot(formula)`",
+          "Try: `boxplot(y ~ <grp>)`"
+        ],
+        reveal: "boxplot(y ~ group)",
+        explain: "Produces a box-and-whisker plot. The formula notation `y ~ group` separates the numeric variable `y` by the levels of `group`.",
+        syntax: "boxplot(y ~ x)",
+        inputs: "Formula (y ~ x) with numeric Y and factor X."
+      },
+      {
+        id: "viz_pairs",
+        type: "code",
+        title: "Pairs Plot",
+        desc: "Create a matrix of scatterplots for dataframe 'df'.",
+        skill: "EDA",
+        difficulty: 2,
+        timeLimit: 120,
+        preLoad: { df: "data.frame(a=1,b=2,c=3)" },
+        solutionPatterns: [/pairs\(\s*df\s*\)/],
+        successOutput: "[Pairs matrix generated]",
+        hintSteps: [
+          "Plot all variables against all others.",
+          "Function: `pairs(...)`",
+          "Try: `pairs(<data>)`"
+        ],
+        reveal: "pairs(df)",
+        explain: "Produces a matrix of scatterplots, plotting every column against every other column. Useful for initial correlation checks.",
+        syntax: "pairs(df)",
+        inputs: "Dataframe or matrix."
+      },
+      {
+        id: "viz_persp",
+        type: "code",
+        title: "3D Perspective",
+        desc: "Create a 3D perspective plot of x, y, z.",
+        skill: "3D",
+        difficulty: 4,
+        timeLimit: 120,
+        preLoad: { x: "v", y: "v", z: "mat" },
+        solutionPatterns: [/persp\(\s*x\s*,\s*y\s*,\s*z\s*\)/],
+        successOutput: "[3D Wireframe generated]",
+        hintSteps: [
+          "Draws a perspective plot of a surface.",
+          "Function: `persp(...)`",
+          "Try: `persp(<x_var>, <y_var>, <z_mat>)`"
+        ],
+        reveal: "persp(x, y, z)",
+        explain: "Draws a 3D perspective plot. `z` must be a matrix containing values for the grid defined by `x` and `y`.",
+        syntax: "persp(x,y,z)",
+        inputs: "Vectors x, y and Matrix z."
+      }
+    ]
+  }
+};
+
+/* --- HINT SAFETY VALIDATOR --- */
+function validateHintSafety(allCampaigns) {
+  const DEV_MODE = false;
+  const problems = [];
+
+  for (const [campKey, camp] of Object.entries(allCampaigns)) {
+    camp.levels.forEach(lvl => {
+      lvl.hintSteps.forEach((hint, idx) => {
+        const cleanHint = hint.replace(/`/g, '').trim();
+        const cleanReveal = lvl.reveal.trim();
+        
+        if (cleanHint === cleanReveal) {
+          problems.push(`[${campKey}:${lvl.id}] Hint ${idx+1} matches reveal exactly.`);
+        }
+
+        if (lvl.solutionPatterns) {
+          lvl.solutionPatterns.forEach(pattern => {
+            if (pattern.test(cleanHint)) {
+              problems.push(`[${campKey}:${lvl.id}] Hint ${idx+1} matches solution regex. Pattern: ${pattern}`);
+            }
+          });
+        }
+      });
+    });
+  }
+
+  if (problems.length > 0) {
+    console.error("HINT SAFETY VIOLATIONS FOUND:");
+    problems.forEach(p => console.warn(p));
+  } else {
+    console.log("%c[Validator] All hints secured.", "color: #10b981; font-weight:bold;");
+  }
+}
+
+/* ========================================
+  GAME ENGINE
+  ========================================
+*/
+
+const state = {
+  currentCampaign: null,
+  currentLevelIdx: 0,
+  score: 0,
+  streak: 1,
+  timeLeft: 0,
+  timerInterval: null,
+  hintsUsed: 0,
+  isPaused: false
+};
+
+const els = {
+  consoleOutput: document.getElementById('console-output'),
+  codeInput: document.getElementById('code-input'),
+  runBtn: document.getElementById('run-btn'),
+  levelTitle: document.getElementById('level-title'),
+  levelDesc: document.getElementById('level-desc'),
+  levelBadge: document.getElementById('level-badge'),
+  timerDisplay: document.getElementById('timer-display'),
+  scoreDisplay: document.getElementById('score-display'),
+  debtBadge: document.getElementById('debt-badge'),
+  streakCount: document.getElementById('streak-count'),
+  streakBadge: document.getElementById('streak-badge'),
+  envDisplay: document.getElementById('env-display'),
+  hintBox: document.getElementById('hint-box'),
+  hintBtn: document.getElementById('hint-btn'),
+  hintCost: document.getElementById('hint-cost'),
+  analysisBtn: document.getElementById('analysis-btn'),
+  revealBtn: document.getElementById('reveal-btn'),
+  menuBtn: document.getElementById('menu-btn'),
+  levelMenu: document.getElementById('level-menu'),
+  campaignGrid: document.getElementById('campaign-grid'),
+  closeMenuBtn: document.getElementById('close-menu-btn'),
+  mcqInterface: document.getElementById('mcq-interface'),
+  cheatBtn: document.getElementById('cheat-btn'),
+  cheatMenu: document.getElementById('cheat-menu'),
+  cheatContent: document.getElementById('cheat-content'),
+  closeCheatBtn: document.getElementById('close-cheat-btn'),
+  startOverlay: document.getElementById('start-overlay'),
+  startBtn: document.getElementById('start-btn'),
+  timeoutModal: document.getElementById('timeout-modal'),
+  timeoutRetryBtn: document.getElementById('timeout-retry-btn'),
+  timeoutRevealBtn: document.getElementById('timeout-reveal-btn'),
+  analysisModal: document.getElementById('analysis-modal'),
+  closeAnalysisBtn: document.getElementById('close-analysis-btn'),
+  analysisTitle: document.getElementById('analysis-title'),
+  analysisText: document.getElementById('analysis-text'),
+  analysisSyntax: document.getElementById('analysis-syntax'),
+  
+  // Data Tab Elements
+  dataTab: document.getElementById('data-tab'),
+  dataTabTitle: document.getElementById('data-tab-title'),
+  dataTabContent: document.getElementById('data-tab-content'),
+  closeDataTabBtn: document.getElementById('close-data-tab')
+};
+
+// --- CORE ---
+function initGame() {
+  validateHintSafety(campaigns);
+  renderCampaignMenu();
+  renderCheatSheet();
+  
+  els.runBtn.addEventListener('click', handleRun);
+  els.hintBtn.addEventListener('click', showHint);
+  els.analysisBtn.addEventListener('click', showAnalysis);
+  els.closeAnalysisBtn.addEventListener('click', closeAnalysis);
+  els.revealBtn.addEventListener('click', revealAnswer);
+  els.menuBtn.addEventListener('click', toggleMenu);
+  els.closeMenuBtn.addEventListener('click', toggleMenu);
+  els.cheatBtn.addEventListener('click', toggleCheat);
+  els.closeCheatBtn.addEventListener('click', toggleCheat);
+  els.startBtn.addEventListener('click', startGame);
+  els.timeoutRetryBtn.addEventListener('click', handleTimeoutRetry);
+  els.timeoutRevealBtn.addEventListener('click', handleTimeoutReveal);
+  els.closeDataTabBtn.addEventListener('click', closeFakeTab);
+  
+  els.codeInput.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleRun();
+    }
+  });
+
+  lucide.createIcons();
+}
+
+function startGame() {
+    els.startOverlay.classList.add('hidden');
+    logToConsole("System initialized. Select a campaign to begin.", "console-info");
+    toggleMenu();
+}
+
+function loadCampaign(key) {
+  state.currentCampaign = campaigns[key];
+  state.currentLevelIdx = 0;
+  state.hintsUsed = 0;
+  logToConsole(`\n> LOADING MODULE: ${state.currentCampaign.consoleTitle}`, "text-blue-400 font-bold");
+  logToConsole(`> ${state.currentCampaign.levels.length} levels loaded.`, "text-slate-400");
+  toggleMenu();
+  loadLevel(0);
+}
+
+function loadLevel(idx, preserveCode = false) {
+  if (idx >= state.currentCampaign.levels.length) {
+    completeCampaign();
+    return;
+  }
+  
+  const level = state.currentCampaign.levels[idx];
+  state.currentLevelIdx = idx;
+  state.timeLeft = level.timeLimit;
+  state.hintsUsed = 0;
+  state.isPaused = false;
+
+  els.levelTitle.innerText = `${level.id}: ${level.title}`;
+  els.levelDesc.innerText = level.desc;
+  els.levelBadge.innerText = `LVL ${idx + 1}/${state.currentCampaign.levels.length}`;
+  els.hintBox.classList.add('hidden');
+  els.hintBox.innerText = '';
+  
+  if (!preserveCode) {
+      els.codeInput.value = '';
+  }
+  
+  els.codeInput.focus();
+  
+  if (level.type === 'choice') {
+    setupMCQ(level);
+  } else {
+    els.mcqInterface.classList.add('hidden');
+    els.codeInput.classList.remove('hidden');
+  }
+
+  renderEnv(level.preLoad || state.currentCampaign.initialObjects);
+
+  clearInterval(state.timerInterval);
+  state.timerInterval = setInterval(tickTimer, 1000);
+  updateTimerDisplay();
+  updateHUD();
+
+  if(!preserveCode) {
+      spawnFloatingText(els.levelTitle, "LEVEL START", "text-blue-400");
+  }
+}
+
+function tickTimer(){
+  if(state.isPaused) return;
+  state.timeLeft--;
+  updateTimerDisplay();
+  if(state.timeLeft <= 0){
+    clearInterval(state.timerInterval);
+    triggerTimeout();
+  }
+}
+
+function updateTimerDisplay(){
+  const s = Math.max(0, Number(state.timeLeft) || 0);
+  els.timerDisplay.innerText = `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+  els.timerDisplay.classList.toggle('text-red-400', s <= 10);
+}
+
+/* --- FAKE TAB LOGIC --- */
+function renderEnv(obj) {
+  els.envDisplay.innerHTML = '';
+  if(!obj || Object.keys(obj).length === 0){
+    els.envDisplay.innerHTML = '<div class="p-2 bg-slate-800/50 rounded border border-slate-700/50 text-slate-400 italic col-span-2">Global Environment is empty</div>';
+    return;
+  }
+  for (const [k, v] of Object.entries(obj)) {
+    const isData = /^(df|data|people|cars|sales|trans|rules|obesity|pretest|posttest|seqs|dtm)/i.test(k);
+    const cursor = isData ? 'cursor-zoom-in hover:bg-slate-700' : 'cursor-default';
+    
+    const card = document.createElement('div');
+    card.className = `p-2 bg-slate-800 rounded border border-slate-700 hover:border-blue-500 transition-colors ${cursor} group relative`;
+    card.innerHTML = `
+        <div class="flex justify-between">
+            <span class="text-blue-400 font-bold">${k}</span> 
+            ${isData ? '<i data-lucide="table" class="w-3 h-3 text-slate-500 group-hover:text-blue-400"></i>' : ''}
+        </div>
+        <div class="text-slate-500 text-[10px]">obj</div>
+        <div class="text-slate-300 truncate mt-1 text-[10px]" title="${v}">${v}</div>
+    `;
+    
+    if(isData) {
+        card.onclick = () => openFakeTab(k, v);
+    }
+    
+    els.envDisplay.appendChild(card);
+  }
+  lucide.createIcons();
+}
+
+function openFakeTab(name, content) {
+    els.dataTab.classList.remove('hidden');
+    els.dataTabTitle.innerText = name;
+    
+    // RESTORED LOGIC: Check for HTML definition first
+    if (typeof datasetDefinitions !== 'undefined' && datasetDefinitions[name]) {
+        els.dataTabContent.innerHTML = datasetDefinitions[name];
+        return;
+    }
+
+    // Fallback to text (v6 default behavior)
+    els.dataTabContent.innerText = ""; // Clear HTML
+    if (content.includes("data.frame")) {
+         els.dataTabContent.innerText = "   id  value\n1   1   10.5\n2   2   20.1\n3   3   15.5\n4   4   12.3\n5   5   30.0";
+    } else {
+        els.dataTabContent.innerText = content.replace(/,/g, "\n");
+    }
+}
+
+function closeFakeTab() {
+    els.dataTab.classList.add('hidden');
+}
+
+/* --- ANALYSIS LOGIC --- */
+function showAnalysis() {
+    const level = state.currentCampaign.levels[state.currentLevelIdx];
+    
+    els.analysisTitle.innerText = level.title;
+    els.analysisText.innerText = level.explain || "No detailed analysis available for this protocol.";
+    els.analysisSyntax.innerText = level.syntax || "Syntax not specified.";
+    
+    state.isPaused = true;
+    els.analysisModal.classList.remove('hidden');
+}
+
+function closeAnalysis() {
+    state.isPaused = false;
+    els.analysisModal.classList.add('hidden');
+}
+
+/* --- TIMEOUT LOGIC --- */
+function triggerTimeout() {
+    state.isPaused = true;
+    els.timeoutModal.classList.remove('hidden');
+    logToConsole("[SYS] Process timed out. Awaiting user decision...", "text-red-400");
+}
+
+function handleTimeoutRetry() {
+    state.timeLeft = 30;
+    state.score -= 20;
+    state.streak = 1;
+    state.isPaused = false;
+    
+    updateHUD();
+    updateTimerDisplay();
+    els.timeoutModal.classList.add('hidden');
+    
+    logToConsole("[SYS] Time extended. Penalty applied.", "text-yellow-400");
+    state.timerInterval = setInterval(tickTimer, 1000);
+    els.codeInput.focus();
+}
+
+function handleTimeoutReveal() {
+    els.timeoutModal.classList.add('hidden');
+    
+    const level = state.currentCampaign.levels[state.currentLevelIdx];
+    state.score -= 50; 
+    state.streak = 1;
+    updateHUD();
+
+    logToConsole(`[SYS] SOLUTION REVEALED:`, "text-green-400 font-bold");
+    logToConsole(level.reveal, "bg-slate-800 text-white p-2 border border-green-500/50 block my-2");
+    
+    if(level.explain) {
+        logToConsole(`[EXPLANATION] ${level.explain}`, "text-slate-300 italic block mb-4");
+    }
+
+    els.codeInput.value = level.reveal;
+    
+    setTimeout(() => {
+        logToConsole("[SYS] Advancing to next level...", "text-slate-500");
+        loadLevel(state.currentLevelIdx + 1);
+    }, 6000);
+}
+
+/* --- HUD/UTIL --- */
+function updateHUD(){
+  const s = Number(state.score) || 0;
+  els.scoreDisplay.innerText = (s < 0 ? '-' : '') + String(Math.abs(s)).padStart(4,'0');
+  els.scoreDisplay.classList.toggle('text-red-300', s < 0);
+  els.debtBadge.classList.toggle('hidden', s >= 0);
+  els.streakBadge.classList.toggle('hidden', state.streak <= 1);
+  els.streakCount.innerText = state.streak;
+  lucide.createIcons();
+}
+
+function logToConsole(text, colorClass=''){
+  const line = document.createElement('div');
+  line.className = `console-line ${colorClass}`;
+  line.innerHTML = text; 
+  els.consoleOutput.appendChild(line);
+  els.consoleOutput.scrollTop = els.consoleOutput.scrollHeight;
+}
+
+function spawnFloatingText(targetEl, text, color){
+  const rect = targetEl.getBoundingClientRect();
+  const el = document.createElement('div');
+  el.innerText = text;
+  el.className = 'floating-text text-xl font-mono';
+  el.style.left = `${rect.left + rect.width/2}px`;
+  el.style.top = `${rect.top}px`;
+  if(color) el.classList.add(...color.split(' '));
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1500);
+}
+
+/* --- ACTIONS --- */
+function handleRun() {
+  const level = state.currentCampaign.levels[state.currentLevelIdx];
+  let userCode = els.codeInput.value.trim();
+
+  logToConsole(`> ${userCode}`, "console-user");
+
+  let passed = false;
+  
+  if (level.solutionPatterns.some(p => p.test(userCode))) {
+    passed = true;
+  } 
+  
+  if (level.type === 'fix' && passed) {
+      // additional check if needed
+  }
+
+  if (passed) {
+    handleSuccess(level);
+  } else {
+    handleFail();
+  }
+}
+
+function handleSuccess(level) {
+  clearInterval(state.timerInterval);
+  
+  const base = 100 * level.difficulty;
+  const timeBonus = state.timeLeft * 2;
+  const total = (base + timeBonus) * state.streak;
+  state.score += total;
+  state.streak = Math.min(state.streak + 0.5, 4); 
+  
+  logToConsole(level.successOutput, "console-success");
+  logToConsole(`[SYS] Correct. +${total} pts`, "text-green-400");
+  spawnFloatingText(els.runBtn, `+${total}`, "text-green-400 font-bold");
+  
+  if(level.explain) logToConsole(`NOTE: ${level.explain}`, "text-slate-500 italic");
+  
+  setTimeout(() => {
+    loadLevel(state.currentLevelIdx + 1);
+  }, 1500);
+  
+  updateHUD();
+}
+
+function handleFail() {
+  state.score -= 20;
+  state.streak = 1;
+  logToConsole("[ERR] Execution failed / output mismatch.", "console-error");
+  spawnFloatingText(els.codeInput, "-20", "text-red-500");
+  els.codeInput.classList.add("neon-border", "border-red-500");
+  setTimeout(() => els.codeInput.classList.remove("neon-border", "border-red-500"), 500);
+  updateHUD();
+}
+
+function showHint() {
+  const level = state.currentCampaign.levels[state.currentLevelIdx];
+  if (state.hintsUsed >= level.hintSteps.length) {
+    logToConsole("[SYS] No more hints available.", "text-yellow-500");
+    return;
+  }
+  
+  state.score -= 50;
+  spawnFloatingText(els.hintBtn, "-50", "text-red-400");
+  
+  const hintText = level.hintSteps[state.hintsUsed];
+  els.hintBox.innerHTML += `<div class="mb-1 border-b border-blue-800/30 pb-1">HINT ${state.hintsUsed+1}: ${formatHint(hintText)}</div>`;
+  els.hintBox.classList.remove('hidden');
+  
+  state.hintsUsed++;
+  updateHUD();
+}
+
+function formatHint(text) {
+  return text.replace(/`([^`]+)`/g, '<span class="text-yellow-300 bg-slate-800 px-1 rounded">$1</span>');
+}
+
+function revealAnswer() {
+  if(!confirm("Surrender? You will lose 200pts and streak.")) return;
+  
+  const level = state.currentCampaign.levels[state.currentLevelIdx];
+  state.score -= 200;
+  state.streak = 1;
+  
+  logToConsole(`[SYS] Solution Revealed:`, "text-red-400");
+  logToConsole(level.reveal, "text-white bg-slate-800 p-2 border border-slate-600");
+  
+  els.codeInput.value = level.reveal;
+  updateHUD();
+}
+
+function completeCampaign() {
+  toggleMenu();
+  alert(`CAMPAIGN COMPLETE!\nFinal Score: ${state.score}`);
+}
+
+/* --- MENU UI --- */
+function renderCampaignMenu() {
+  els.campaignGrid.innerHTML = '';
+  Object.entries(campaigns).forEach(([key, camp], idx) => {
+    const card = document.createElement('div');
+    card.className = "bg-slate-900 p-4 rounded border border-slate-700 hover:border-blue-500 hover:bg-slate-800 transition-all cursor-pointer group";
+    card.innerHTML = `
+      <div class="flex justify-between items-start mb-2">
+        <h3 class="font-bold text-blue-100 group-hover:text-blue-400">${camp.title}</h3>
+        <i data-lucide="terminal-square" class="w-5 h-5 text-slate-600 group-hover:text-blue-500"></i>
+      </div>
+      <div class="text-xs text-slate-500 font-mono mb-4">${camp.levels.length} Levels</div>
+      <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+        <div class="bg-blue-600 h-full w-0 group-hover:w-full transition-all duration-1000"></div>
+      </div>
+    `;
+    card.onclick = () => loadCampaign(key);
+    els.campaignGrid.appendChild(card);
+  });
+  lucide.createIcons();
+}
+
+function toggleMenu() {
+  els.levelMenu.classList.toggle('hidden');
+  state.isPaused = !els.levelMenu.classList.contains('hidden');
+}
+
+/* --- CHEAT SHEET LOGIC (VIBRANT) --- */
+function renderCheatSheet() {
+    els.cheatContent.innerHTML = '';
+    
+    Object.entries(campaigns).forEach(([key, camp], idx) => {
+        const section = document.createElement('div');
+        section.innerHTML = `
+            <h3 class="text-lg font-bold text-neon-gold border-b border-slate-700 pb-2 mb-4 drop-shadow-[0_0_5px_rgba(251,191,36,0.5)]">${camp.title}</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                ${camp.levels.map(lvl => `
+                    <div class="bg-slate-900/80 p-3 rounded border border-slate-600 hover:border-neon-blue transition-all hover:shadow-[0_0_15px_rgba(59,130,246,0.3)] flex flex-col gap-2">
+                        <div class="flex justify-between items-start">
+                            <span class="text-xs text-blue-200 uppercase font-bold tracking-widest">${lvl.title}</span>
+                        </div>
+                        <div class="font-mono text-neon-green text-xs break-all bg-slate-950 p-2 rounded border border-slate-800 shadow-inner">
+                            ${lvl.syntax || "N/A"}
+                        </div>
+                        <div class="text-[10px] font-mono text-slate-300">
+                            <span class="font-bold text-neon-cyan">REQ:</span> ${lvl.inputs || "Standard inputs"}
+                        </div>
+                        <div class="text-xs text-slate-300 leading-relaxed border-t border-slate-700 pt-2 mt-auto">
+                            ${lvl.explain || ""}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        els.cheatContent.appendChild(section);
+    });
+}
+
+function toggleCheat() {
+    els.cheatMenu.classList.toggle('hidden');
+}
+
+/* --- MCQ LOGIC --- */
+function setupMCQ(level) {
+  els.codeInput.classList.add('hidden');
+  els.mcqInterface.classList.remove('hidden');
+  els.mcqInterface.innerHTML = '';
+  
+  level.choices.forEach((choiceText, idx) => {
+    const btn = document.createElement('button');
+    btn.className = "w-full text-left p-4 rounded border border-slate-700 bg-slate-800/50 hover:bg-blue-900/20 hover:border-blue-500 transition-all text-sm font-mono flex gap-3";
+    btn.innerHTML = `
+      <span class="font-bold text-slate-500">[${String.fromCharCode(65+idx)}]</span>
+      <span class="text-slate-200">${choiceText}</span>
+    `;
+    
+    btn.onclick = () => checkMCQ(idx, level);
+    els.mcqInterface.appendChild(btn);
+  });
+}
+
+function checkMCQ(selectedIndex, level) {
+  if (selectedIndex === level.correctChoice) {
+    handleSuccess(level);
+  } else {
+    handleFail();
+  }
+}
+
+// Start
+window.onload = initGame;
+
+</script>
+</body>
+</html>
